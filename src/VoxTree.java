@@ -51,7 +51,6 @@ public class VoxTree {
     private static final byte NODE_RED_SHIFT        = 16;
     private static final byte NODE_ALPHA_SHIFT      = 24;
     private static final byte NODE_CHILD_SHIFT      = 32;
-    private static final byte NODE_FLAG_LEAF_SHIFT  = 56;
     private static final byte NODE_DEPTH_SHIFT      = 60;
 
     private static long setNodeColor(long node, int red, int green, int blue, int alpha){
@@ -169,10 +168,10 @@ public class VoxTree {
             result.append("NODE {");
         }
         fmt.format("%08X", getNodeColor(node));
-        result.append("   Color: " + fmt.toString());
-        result.append("   Depth: " + getNodeDepth(node));
-        result.append("   Child: " + getNodeChild(node));
-        result.append("}" + NEW_LINE);
+        result.append("   Color: ").append(fmt.toString());
+        result.append("   Depth: ").append(getNodeDepth(node));
+        result.append("   Child: ").append(getNodeChild(node));
+        result.append("}").append(NEW_LINE);
         return result.toString();
     }
     /**
@@ -222,7 +221,6 @@ public class VoxTree {
         // Which child are we in, based on position relative to midpoints;
         // we know we are in the parent voxel already
         int sub = 0;
-        int child = 0;
         if (voxel.z > zm){
             sub |= 1;
         }
@@ -234,6 +232,7 @@ public class VoxTree {
         }
 
         // Break leaf into a node
+        int child;
         if (isNodeLeaf(parentNode)){
             long childNode = setNodeDepth(parentNode, (byte)(depth+1));
             //childNode = setNodeColor(childNode, 0x00FF00FF);
@@ -415,7 +414,6 @@ public class VoxTree {
                 return nodeIndex;
             }
 
-            if ((hotNode > 0) && (hotNode == nodeIndex)) return 0xFFFFFFFF;
 
             // Lighting model!
             // Fake it for now, no lights yet
@@ -433,6 +431,11 @@ public class VoxTree {
             if ((facet & mirror) > 0)
                 normal.scale(-1);
             double illumination = ambientCoefficient + diffuseCoefficient*diffuseLight.dot(normal);
+
+            if ((hotNode > 0) && (hotNode == nodeIndex)){
+                double cycle = (double)System.currentTimeMillis() / 200.0;
+                illumination = 0.9 + (Math.pow(Math.cos(cycle), 3.0) * 0.1);
+            }
 
             return illuminateColor(rgba, illumination);
         }
@@ -452,7 +455,7 @@ public class VoxTree {
         do {
             switch (cube){
                 case 0:
-                    nextColor = processSubtree(tx0, ty0, tz0, txM, tyM, tzM, childIndex + (0 ^ mirror), rgba, pick);
+                    nextColor = processSubtree(tx0, ty0, tz0, txM, tyM, tzM, childIndex + (mirror), rgba, pick);
                     cube = nextNode(txM, tyM, tzM, 4, 2, 1);
                     break;
                 case 1:
@@ -522,13 +525,13 @@ public class VoxTree {
         dz = 1.0 / Math.max(verySmallValue, dz);
 
 
-        double tx0 = (nearTopLeft.x - ox) * (double)dx;
-        double ty0 = (nearTopLeft.y - oy) * (double)dy;
-        double tz0 = (nearTopLeft.z - oz) * (double)dz;
+        double tx0 = (nearTopLeft.x - ox) * dx;
+        double ty0 = (nearTopLeft.y - oy) * dy;
+        double tz0 = (nearTopLeft.z - oz) * dz;
 
-        double tx1 = (farBottomRight.x - ox) * (double)dx;
-        double ty1 = (farBottomRight.y - oy) * (double)dy;
-        double tz1 = (farBottomRight.z - oz) * (double)dz;
+        double tx1 = (farBottomRight.x - ox) * dx;
+        double ty1 = (farBottomRight.y - oy) * dy;
+        double tz1 = (farBottomRight.z - oz) * dz;
 
         double tmin = Math.max(tx0, Math.max(ty0, tz0));
         double tmax = Math.min(tx1, Math.min(ty1, tz1));
@@ -545,12 +548,12 @@ public class VoxTree {
         StringBuilder result = new StringBuilder();
         String NEW_LINE = System.getProperty("line.separator");
 
-        result.append(this.getClass() + " Object {" + NEW_LINE);
-        result.append("   Free Node: " + firstFreeNode + NEW_LINE);
-        result.append("   Tree Depth: " + TREE_DEPTH + NEW_LINE);
-        result.append("   Edge Length: " + edgeLength + NEW_LINE);
-        result.append("   Corner 0: " + nearTopLeft + NEW_LINE);
-        result.append("   Corner 1: " + farBottomRight + NEW_LINE);
+        result.append(this.getClass()).append(" Object {").append(NEW_LINE);
+        result.append("   Free Node: ").append(firstFreeNode).append(NEW_LINE);
+        result.append("   Tree Depth: ").append(TREE_DEPTH).append(NEW_LINE);
+        result.append("   Edge Length: ").append(edgeLength).append(NEW_LINE);
+        result.append("   Corner 0: ").append(nearTopLeft).append(NEW_LINE);
+        result.append("   Corner 1: ").append(farBottomRight).append(NEW_LINE);
         for (int idx=0; idx<Math.min(65, firstFreeNode); ++idx){
             result.append(idx);
             result.append(": ");

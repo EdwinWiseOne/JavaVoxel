@@ -20,14 +20,17 @@ public class Display extends Canvas implements Runnable, KeyListener {
      *
      */
     private static final long serialVersionUID = 1L;
+
     public static final int WIDTH = 320;
     public static final int VIEW_WIDTH = WIDTH*3;
     public static final int HEIGHT = 240;
     public static final int VIEW_HEIGHT = HEIGHT*3;
-    private static final double ASPECT = (double)HEIGHT/(double)WIDTH;
 
     private static final double H_FOV = Math.PI / 3.0;  // 60 degrees
-    private static final double V_FOV = H_FOV * ASPECT;
+
+    //private static final double ASPECT = (double)HEIGHT/(double)WIDTH;
+    //private static final double V_FOV = H_FOV * ASPECT;
+
     private static final double VIEW_DIST = WIDTH / Math.tan(H_FOV * 0.5);
 
     private static final int imageType = BufferedImage.TYPE_INT_RGB;
@@ -36,7 +39,6 @@ public class Display extends Canvas implements Runnable, KeyListener {
 
     private boolean running = false;
     private BufferedImage img;
-    private Random rand;
 
     private Point3d pov;
     private double heading;
@@ -51,7 +53,7 @@ public class Display extends Canvas implements Runnable, KeyListener {
     private int activeNode;
 
     public Display(){
-        rand = new Random();
+        Random rand = new Random();
         img = new BufferedImage(WIDTH, HEIGHT, imageType);
 
         // TODO: don't use 256, but query the voxtree for its dimension
@@ -218,7 +220,7 @@ elevation = Math.toRadians(0);
 
         //g.drawImage(img, 0, 0, null);
         //g.drawImage(createImg(WIDTH, HEIGHT), 0, 0, null);
-        g.drawImage(createImg(WIDTH, HEIGHT), 0, 0, VIEW_WIDTH, VIEW_HEIGHT, Color.BLACK, null);
+        g.drawImage(createImg(), 0, 0, VIEW_WIDTH, VIEW_HEIGHT, Color.BLACK, null);
 
         g.dispose();
         bs.show();
@@ -242,7 +244,7 @@ elevation = Math.toRadians(0);
         rc.start();
     }
 
-    public BufferedImage createImg(int width, int height){
+    public BufferedImage createImg(){
         int[] pixels = ((DataBufferInt)img.getRaster().getDataBuffer()).getData();
 
         int x;
@@ -264,10 +266,6 @@ elevation = Math.toRadians(0);
             if (x == 0){
                 at.set(column0);
                 column0.sub(upVec);
-            }
-            double epsilon = .5;
-            if ( (Math.abs(at.x - 100) < epsilon) && (Math.abs(at.y - 50) < epsilon)){
-                int fred = 1;
             }
 
             facing.sub(at, pov);
