@@ -5,6 +5,8 @@ import javax.vecmath.Point3i;
 import javax.vecmath.Vector3d;
 import java.util.Random;
 
+// QSC powered speakers
+
 public class VoxTree {
     class State {
         public Point3d t0;
@@ -70,13 +72,15 @@ public class VoxTree {
     public long pickNodePath;
     public int pickNodeIndex;
     public int pickFacet;
+    public Vector3d pickRay;
+
 
     private int facet;
     private Vector3d facing;
 
-    private static final int XY_PLANE = 1;
-    private static final int YZ_PLANE = 4;
-    private static final int XZ_PLANE = 2;
+    public static final int XY_PLANE = 1;
+    public static final int XZ_PLANE = 2;
+    public static final int YZ_PLANE = 4;
 
     private static final int BRICK_EDGE = 16;
     /**
@@ -104,6 +108,7 @@ public class VoxTree {
         pickNodePath = 0;
         pickNodeIndex = 0;
         pickFacet = 0;
+        pickRay = new Vector3d();
 
         facing = new Vector3d(0.0, 0.0, 0.0);
         facet = 0;
@@ -258,12 +263,49 @@ public class VoxTree {
         return nodeIndex;
     }
 
+    public Point3i getVoxelPoint(long path) {
+        int offset = edgeLength >> 1;
+        Point3i center = new Point3i(offset, offset, offset);
+
+        int depth = Path.depth(path);
+        int nodeIndex = 0;
+        long node;
+        for (int cnt=0; cnt<depth; ++cnt) {
+            int child = Path.child(path, cnt);
+
+            offset >>= 1;
+            if ((child & XY_PLANE) == 0) {
+                center.z -= offset;
+            } else {
+                center.z += offset;
+            }
+            if ((child & YZ_PLANE) == 0) {
+                center.x -= offset;
+            } else {
+                center.x += offset;
+            }
+            if ((child & XZ_PLANE) == 0) {
+                center.y -= offset;
+            } else {
+                center.y += offset;
+            }
+
+            node = nodeArray[nodeIndex];
+            nodeIndex = Node.child(node) + Path.child(path, cnt);
+        }
+        return center;
+
+    }
+
 
     /**
      *
      */
     public long castRay(Point3d inOrigin, Vector3d inRay, boolean pick){
         // Mirror the ray into quadrant 1
+        if (pick) {
+            pickRay.set(inRay);
+        }
         ray.set(inRay);
         origin.set(inOrigin);
         mirror = 0;
@@ -358,8 +400,10 @@ public class VoxTree {
                                 pickNodePath = state.nodePath;
                                 pickNodeIndex = state.nodeIndex;
                                 pickFacet = facet;
+//                                pickRay.set(ray);
+
                                 int index = getIndexForPath(pickNodePath);
-                                System.out.println("Picked " + pickNodeIndex + " -> " + Path.toString(pickNodePath) + " -> " + index);
+                                //System.out.println("Picked " + pickNodeIndex + " -> " + Path.toString(pickNodePath) + " -> " + index);
                             }
                         }
 

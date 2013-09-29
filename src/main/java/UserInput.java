@@ -1,5 +1,6 @@
 
 import javax.vecmath.Point3d;
+import javax.vecmath.Point3i;
 import javax.vecmath.Vector3d;
 
 import java.awt.*;
@@ -228,12 +229,22 @@ viewPoint.set(30, 210, -206);
 
     public void mouseClicked(MouseEvent e){
         long path = tree.pickNodePath;
-        if (e.getButton() == MouseEvent.BUTTON1){
-//            int depth = Path.depth(path);
-//            tree.setVoxelPath(Path.setDepth(path, depth-1), (int)Color.setColor(0, 255, 128, 255));
-            tree.setVoxelPath(path, (int)Color.setColor(0, 255, 128, 255));
-        } else if (e.getButton() == MouseEvent.BUTTON3){
+        if (e.getButton() == MouseEvent.BUTTON3){
             tree.setVoxelPath(path, 0);
+        } else if (e.getButton() == MouseEvent.BUTTON1){
+            Point3i center = tree.getVoxelPoint(tree.pickNodePath);
+            switch (tree.pickFacet) {
+                case VoxTree.XY_PLANE:
+                    center.add(new Point3i(0, 0, -(int)Math.copySign(tree.stride(), tree.pickRay.z)));
+                    break;
+                case VoxTree.YZ_PLANE:
+                    center.add(new Point3i(-(int)Math.copySign(tree.stride(), tree.pickRay.x), 0, 0));
+                    break;
+                case VoxTree.XZ_PLANE:
+                    center.add(new Point3i(0, -(int)Math.copySign(tree.stride(), tree.pickRay.y), 0));
+                    break;
+            }
+            tree.setVoxelPoint(center, (int)Color.setColor(0, 255, 128, 255));
         }
     }
 
