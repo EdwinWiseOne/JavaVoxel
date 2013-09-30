@@ -6,7 +6,7 @@ import org.testng.annotations.*;
 public class NodeTest {
 
     @DataProvider(name = "colors")
-    public Object[][] createColors() {
+    private Object[][] createColors() {
         return new Object[][] {
                 // Red, Green, Blue, Alpha
                 // Basic field testing
@@ -26,7 +26,7 @@ public class NodeTest {
     }
 
     @DataProvider(name = "children")
-    public Object[][] createChildren() {
+    private Object[][] createChildren() {
         return new Object[][] {
                 // Base node, child index, alpha (guard)
                 {0L, 0, 0},
@@ -39,7 +39,7 @@ public class NodeTest {
     }
 
     @DataProvider(name = "leaf")
-    public Object[][] createLeaf() {
+    private Object[][] createLeaf() {
         return new Object[][] {
                 // Base node, leaf, depth (guard)
                 {0L, true, 0},
@@ -50,7 +50,7 @@ public class NodeTest {
     }
 
     @DataProvider(name = "depth")
-    public Object[][] createDepth() {
+    private Object[][] createDepth() {
         return new Object[][] {
                 // Base node, depth, blue (guard)
                 {0L, 0, 0},

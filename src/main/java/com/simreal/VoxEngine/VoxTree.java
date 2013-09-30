@@ -46,12 +46,12 @@ public class VoxTree {
 
     private static int PICK_DEPTH = 256;
 
-    private int depth;
-    private int numNodes;
-    private int edgeLength;
+    int depth;
+    int numNodes;
+    int edgeLength;
 
-    private long[] nodeArray;
-    private int firstFreeNode = 0;
+    long[] nodeArray;
+    int firstFreeNode = 0;
 
     private Point3d nearTopLeft;
     private Point3d farBottomRight;
@@ -82,7 +82,7 @@ public class VoxTree {
     public static final int XZ_PLANE = 2;
     public static final int YZ_PLANE = 4;
 
-    private static final int BRICK_EDGE = 16;
+    static final int BRICK_EDGE = 16;
     /**
      *
      */
@@ -559,6 +559,32 @@ public class VoxTree {
         return octant.z;  // exit XY Plane
     }
 
+    class VoxTreeStatistics {
+        public int depth;
+        public int numNodes;
+        public int numLeaves;
+
+        VoxTreeStatistics() {
+            depth = 0;
+            numNodes = 0;
+            numLeaves = 0;
+        }
+    }
+
+    VoxTreeStatistics analyze() {
+        VoxTreeStatistics stats = new VoxTreeStatistics();
+
+        for (int idx=0; idx<firstFreeNode; ++idx){
+            if (Node.isLeaf(nodeArray[idx]))
+                ++stats.numLeaves;
+            else
+                ++stats.numNodes;
+        }
+
+        stats.depth = this.depth;
+
+        return stats;
+    }
 
     public String toString(){
         StringBuilder result = new StringBuilder();
@@ -583,6 +609,7 @@ public class VoxTree {
             result.append(idx);
             result.append(": ");
             result.append(Node.toString(nodeArray[idx]));
+            result.append(NEW_LINE);
         }
         if (firstFreeNode > 65) result.append("...").append(NEW_LINE);
         result.append("}");

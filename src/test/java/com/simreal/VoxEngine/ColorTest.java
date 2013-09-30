@@ -6,7 +6,7 @@ import org.testng.annotations.*;
 public class ColorTest {
 
     @DataProvider(name = "colors")
-    public Object[][] createColors() {
+    private Object[][] createColors() {
         return new Object[][] {
                 // Red, Green, Blue, Alpha
                 // Basic field testing
