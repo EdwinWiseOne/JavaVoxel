@@ -22,24 +22,24 @@ public class Path {
      *
      *  64            56            48            40            32
      *    +------+------+------+------+------+------+------+------+
-     *    | child[16] : 3-bits * 16 = 48                          |
+     *    | child[16] : 3-bits * 19 = 57                          |
      *    +------+------+------+------+------+------+------+------+
-     *    |                           | n/a         | n/a  |depth |
+     *    |                                          |n/a | depth |
      *    +------+------+------+------+------+------+------+------+
-     *                24            16             8             0
+     *                24            16             8 7    5      0
      */
     // TODO: Create a path iterator
 
-    public static final int PATH_MAX_DEPTH     = 15;
+    public static final int PATH_MAX_DEPTH     = 19;
 
-    private static final long PATH_DEPTH_MASK   = 0x00000000000000FFL;
-    private static final long PATH_PATH_MASK    = 0xFFFFFFFFFFFF0000L;
+    private static final long PATH_DEPTH_MASK   = 0x000000000000001FL;
+    private static final long PATH_PATH_MASK    = 0xFFFFFFFFFFFFFF80L;
     private static final long PATH_HEAD_MASK    = 0xE000000000000000L;
 
     private static final long PATH_CHILD_MASK   = 0x0000000000000007L;
 
     private static final byte PATH_DEPTH_SHIFT  = 0;
-    private static final byte PATH_PATH_SHIFT   = 16;
+    private static final byte PATH_PATH_SHIFT   = 7;
     private static final byte PATH_HEAD_SHIFT   = 61;
 
 

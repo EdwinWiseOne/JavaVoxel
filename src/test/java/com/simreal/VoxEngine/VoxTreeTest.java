@@ -14,14 +14,41 @@ public class VoxTreeTest {
     @DataProvider(name = "insertion")
     private Object[][][] insertionData() {
         return new Object[][][][] {
+                // Test 8 children at 0,0,0 corner
                 {
                         {
                                 // X, Y, Z, Leaves, Nodes
                                 { 0x00 + 8, 0x00 + 8, 0x00 + 8, 29, 4 },
+                                { 0x00 + 8, 0x00 + 8, 0x10 + 8, 29, 4 },
+                                { 0x00 + 8, 0x10 + 8, 0x00 + 8, 29, 4 },
+                                { 0x00 + 8, 0x10 + 8, 0x10 + 8, 29, 4 },
                                 { 0x10 + 8, 0x00 + 8, 0x00 + 8, 29, 4 },
                                 { 0x10 + 8, 0x00 + 8, 0x10 + 8, 29, 4 },
-                                { 0x00 + 8, 0x00 + 8, 0x10 + 8, 29, 4 },
+                                { 0x10 + 8, 0x10 + 8, 0x00 + 8, 29, 4 },
+                                { 0x10 + 8, 0x10 + 8, 0x10 + 8, 29, 4 },
                         },
+                },
+                // Test 8 children deeper in
+                {
+                        {
+                                // X, Y, Z, Leaves, Nodes
+                                { 0x100 + 8, 0x100 + 8, 0x100 + 8, 29, 4 },
+                                { 0x100 + 8, 0x100 + 8, 0x110 + 8, 29, 4 },
+                                { 0x100 + 8, 0x110 + 8, 0x100 + 8, 29, 4 },
+                                { 0x100 + 8, 0x110 + 8, 0x110 + 8, 29, 4 },
+                                { 0x110 + 8, 0x100 + 8, 0x100 + 8, 29, 4 },
+                                { 0x110 + 8, 0x100 + 8, 0x110 + 8, 29, 4 },
+                                { 0x110 + 8, 0x110 + 8, 0x100 + 8, 29, 4 },
+                                { 0x110 + 8, 0x110 + 8, 0x110 + 8, 29, 4 },
+                        },
+                },
+                // Split open two cubes
+                {
+                        {
+                                // X, Y, Z, Leaves, Nodes
+                                { 0x00 + 8, 0x00 + 8, 0x00 + 8, 29, 4 },
+                                { 0x20 + 8, 0x00 + 8, 0x10 + 8, 36, 5 },
+                        }
                 },
         };
     }
@@ -51,10 +78,10 @@ public class VoxTreeTest {
         for (int idx=0; idx<details.length; ++idx) {
             Object[] row = details[idx];
             tree.setVoxelPoint(new Point3i((Integer)row[0], (Integer)row[1], (Integer)row[2]), (int)color);
+System.out.println(tree);
 
             int leaves = (Integer)row[3];
             int nodes = (Integer)row[4];
-            System.out.println(tree);
             VoxTree.VoxTreeStatistics stats = tree.analyze();
             Assert.assertEquals(stats.numLeaves, leaves);
             Assert.assertEquals(stats.numNodes, nodes);
