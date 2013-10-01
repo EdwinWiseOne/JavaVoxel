@@ -2,6 +2,8 @@ package com.simreal.VoxEngine;
 
 
 import com.simreal.VoxEngine.annotations.Stateless;
+
+import javax.vecmath.Point3i;
 import java.util.Formatter;
 
 @Stateless
@@ -41,6 +43,11 @@ public class Path {
     private static final byte PATH_DEPTH_SHIFT  = 0;
     private static final byte PATH_PATH_SHIFT   = 7;
     private static final byte PATH_HEAD_SHIFT   = 61;
+
+
+    public static final int Z_AXIS = 1;
+    public static final int Y_AXIS = 2;
+    public static final int X_AXIS = 4;
 
 
     public static int depth(long path){
@@ -87,6 +94,67 @@ public class Path {
         if (depth >= PATH_MAX_DEPTH) return path;
 
         return setDepth(setChild(path, depth, child), depth+1);
+    }
+
+    /**
+     * Given a position (within the given volume) determine the path to that position
+     * (to a given depth)
+     *
+     * @param position
+     * @param edgeLength
+     * @param depth
+     * @return
+     */
+    public static long fromPosition(Point3i position, int edgeLength, int depth) {
+
+    }
+
+
+    /**
+     *  Parse a path, which is a series of child choices that represent a descent down an oct-tree,
+     *  into a position in cube space (the minimum corner)
+     *
+     * @param path
+     * @param edgeLength
+     * @return
+     */
+    public static Point3i toPosition(long path, int edgeLength) {
+        int offset = edgeLength >> 1;
+        Point3i center = new Point3i(offset, offset, offset);
+
+        int depth = Path.depth(path);
+        for (int cnt=0; cnt<depth; ++cnt) {
+            int child = Path.child(path, cnt);
+
+            offset >>= 1;
+            if ((child & Z_AXIS) == 0) {
+                center.z -= offset;
+            } else {
+                center.z += offset;
+            }
+            if ((child & X_AXIS) == 0) {
+                center.x -= offset;
+            } else {
+                center.x += offset;
+            }
+            if ((child & Y_AXIS) == 0) {
+                center.y -= offset;
+            } else {
+                center.y += offset;
+            }
+        }
+        return center;
+    }
+
+    /**
+     * Parse a path into an ID sequence, by intermixing the bits.  This should turn the X, Y, Z into
+     * an ID long that still preserves locality.
+     *
+     * @param path
+     * @return
+     */
+    public static long toID(long path) {
+
     }
 
     static String toString(long path){
