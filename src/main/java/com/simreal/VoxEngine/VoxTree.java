@@ -286,40 +286,6 @@ public class VoxTree {
         return nodeIndex;
     }
 
-    public Point3i getVoxelPoint(long path) {
-        int offset = edgeLength >> 1;
-        Point3i center = new Point3i(offset, offset, offset);
-
-        int depth = Path.depth(path);
-        int nodeIndex = 0;
-        long node;
-        for (int cnt=0; cnt<depth; ++cnt) {
-            int child = Path.child(path, cnt);
-
-            offset >>= 1;
-            if ((child & XY_PLANE) == 0) {
-                center.z -= offset;
-            } else {
-                center.z += offset;
-            }
-            if ((child & YZ_PLANE) == 0) {
-                center.x -= offset;
-            } else {
-                center.x += offset;
-            }
-            if ((child & XZ_PLANE) == 0) {
-                center.y -= offset;
-            } else {
-                center.y += offset;
-            }
-
-            node = nodeArray[nodeIndex];
-            nodeIndex = Node.child(node) + Path.child(path, cnt);
-        }
-        return center;
-
-    }
-
 
     /**
      *
