@@ -51,7 +51,7 @@ public class VoxTree {
     int edgeLength;
 
     long[] nodeArray;
-    int firstFreeNode = 0;
+    int firstFreeNode;
 
     private Point3d nearTopLeft;
     private Point3d farBottomRight;
@@ -92,6 +92,12 @@ public class VoxTree {
         this.numNodes = 1024 * 1024;
 
         nodeArray = new long[numNodes];
+        firstFreeNode = 0;
+        // Chain together all of the free nodes
+        for (int idx=0; idx<(numNodes-1); ++idx) {
+            nodeArray[idx] = Node.setChild(0L, idx+1);
+        }
+        nodeArray[numNodes-1] = Node.END_OF_EMPTY;
 
         nearTopLeft = new Point3d(0, 0, 0);
         farBottomRight = new Point3d(edgeLength, edgeLength, edgeLength);
@@ -101,6 +107,7 @@ public class VoxTree {
         origin = new Point3d();
         ray = new Vector3d();
 
+        long nodeIndex =
         nodeArray[0] = Node.setLeaf(0, true);
         firstFreeNode = 1;
         rand = new Random();
@@ -137,6 +144,7 @@ public class VoxTree {
         long parentNode = nodeArray[parentIndex];
         int depth = Node.depth(parentNode);
 
+        // If we've reached the bottom of the tree, set the node and exit
         if (depth == this.depth){
             nodeArray[parentIndex] = Node.setColor(parentNode, color);
             return color;
@@ -156,6 +164,7 @@ public class VoxTree {
         }
 
         // Break leaf into a node
+        // TODO: Maintain a free-node list
         int child;
         if (Node.isLeaf(parentNode)){
             long childNode = Node.setDepth(parentNode, (byte) (depth + 1));
@@ -207,26 +216,40 @@ public class VoxTree {
                 break;
         }
 
-        long red = 0;
-        long green = 0;
-        long blue = 0;
-        long alpha = 0;
+        // If all children are the same color, coalesce into this parent
+        boolean merge = true;
         for (int idx=0; idx<8; ++idx){
-            if (idx == sub){
-                red += Color.red(color);
-                green += Color.green(color);
-                blue += Color.blue(color);
-                alpha += Color.alpha(color);
-            } else {
-                long node = nodeArray[child+idx];
-                red += Node.red(node);
-                green += Node.green(node);
-                blue += Node.blue(node);
-                alpha += Node.alpha(node);
+            long node = nodeArray[child+idx];
+            if (color != Node.color(node)) {
+                merge = false;
+                break;
             }
         }
 
-        nodeArray[parentIndex] = Node.setColor(parentNode, (int) (red >>> 3), (int) (green >>> 3), (int) (blue >>> 3), (int) (alpha >>> 3));
+        if (merge) {
+
+        } else {
+            // Accumulate child colors
+            long red = 0;
+            long green = 0;
+            long blue = 0;
+            long alpha = 0;
+            for (int idx=0; idx<8; ++idx){
+                if (idx == sub){
+                    red += Color.red(color);
+                    green += Color.green(color);
+                    blue += Color.blue(color);
+                    alpha += Color.alpha(color);
+                } else {
+                    long node = nodeArray[child+idx];
+                    red += Node.red(node);
+                    green += Node.green(node);
+                    blue += Node.blue(node);
+                    alpha += Node.alpha(node);
+                }
+            }
+            nodeArray[parentIndex] = Node.setColor(parentNode, (int) (red >>> 3), (int) (green >>> 3), (int) (blue >>> 3), (int) (alpha >>> 3));
+        }
 
         return Node.color(nodeArray[parentIndex]);
     }
