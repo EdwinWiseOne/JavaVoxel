@@ -43,7 +43,7 @@ class Node {
     private static final byte NODE_CHILD_SHIFT      = 32;
     private static final byte NODE_DEPTH_SHIFT      = 60;
 
-    public static final int END_OF_EMPTY = 0;
+    public static final int END_OF_FREE_NODES = 0;
 
     static long setColor(long node, int red, int green, int blue, int alpha){
         long rgba = Color.setColor(red, green, blue, alpha);

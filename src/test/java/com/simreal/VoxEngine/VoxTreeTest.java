@@ -63,7 +63,7 @@ public class VoxTreeTest {
         Assert.assertEquals(tree.depth, DEPTH);
         Assert.assertEquals(tree.edgeLength, (1<<DEPTH) * VoxTree.BRICK_EDGE);
         Assert.assertEquals(tree.stride(), VoxTree.BRICK_EDGE);
-        Assert.assertEquals(tree.firstFreeNode, 1);
+        Assert.assertEquals(tree.firstFreeNodeIndex, 1);
 
         VoxTree.VoxTreeStatistics stats = tree.analyze();
         Assert.assertEquals(stats.numLeaves, 1);

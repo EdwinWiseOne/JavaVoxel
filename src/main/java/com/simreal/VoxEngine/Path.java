@@ -34,15 +34,15 @@ public class Path {
 
     public static final int PATH_MAX_DEPTH     = 19;
 
-    private static final long PATH_DEPTH_MASK   = 0x000000000000001FL;
-    private static final long PATH_PATH_MASK    = 0xFFFFFFFFFFFFFF80L;
-    private static final long PATH_HEAD_MASK    = 0xE000000000000000L;
+    static final long PATH_DEPTH_MASK   = 0x000000000000001FL;
+    static final long PATH_PATH_MASK    = 0xFFFFFFFFFFFFFF80L;
+    static final long PATH_HEAD_MASK    = 0xE000000000000000L;
 
-    private static final long PATH_CHILD_MASK   = 0x0000000000000007L;
+    static final long PATH_CHILD_MASK   = 0x0000000000000007L;
 
-    private static final byte PATH_DEPTH_SHIFT  = 0;
-    private static final byte PATH_PATH_SHIFT   = 7;
-    private static final byte PATH_HEAD_SHIFT   = 61;
+    static final byte PATH_DEPTH_SHIFT  = 0;
+    static final byte PATH_PATH_SHIFT   = 7;
+    static final byte PATH_HEAD_SHIFT   = 61;
 
 
     public static final int Z_AXIS = 1;
@@ -138,57 +138,57 @@ public class Path {
             // we know we are in the parent voxel already
             sub = 0;
             if (position.z > zm){
-                sub |= 1;
+                sub |= Z_AXIS;  // 1
             }
             if (position.y > ym){
-                sub |= 2;
+                sub |= Y_AXIS;  // 2
             }
             if (position.x > xm){
-                sub |= 4;
+                sub |= X_AXIS;  // 4
             }
             path = Path.addChild(path, sub);
 
             // Reconfigure to the sub-voxel
             switch (sub){
                 case 0:
-                    x1 = xm;
-                    y1 = ym;
                     z1 = zm;
+                    y1 = ym;
+                    x1 = xm;
                     break;
                 case 1:
                     z0 = zm;
-                    x1 = xm;
-                    y1 = ym;
+                    y1 = xm;
+                    x1 = ym;
                     break;
                 case 2:
-                    y0 = ym;
-                    x1 = xm;
-                    z1 = zm;
+                    z1 = ym;
+                    y0 = xm;
+                    x1 = zm;
                     break;
                 case 3:
-                    y0 = ym;
-                    z0 = zm;
+                    z0 = ym;
+                    y0 = zm;
                     x1 = xm;
                     break;
                 case 4:
-                    x0 = xm;
+                    z1 = xm;
                     y1 = ym;
-                    z1 = zm;
+                    x0 = zm;
                     break;
                 case 5:
-                    x0 = xm;
-                    z0 = zm;
-                    y1 = ym;
+                    z0 = xm;
+                    y1 = zm;
+                    x0 = ym;
                     break;
                 case 6:
-                    x0 = xm;
-                    x1 = xm;
-                    z1 = zm;
+                    z1 = xm;
+                    y0 = xm;
+                    x0 = zm;
                     break;
                 case 7:
-                    x0 = xm;
+                    z0 = xm;
                     y0 = ym;
-                    z0 = zm;
+                    x0 = zm;
                     break;
             }
         }
@@ -230,6 +230,12 @@ public class Path {
                 center.y += offset;
             }
         }
+        // Enforce position to middle of voxel
+        int mask = ~((offset << 1) - 1);
+        center.x &= mask + offset;
+        center.y &= mask + offset;
+        center.z &= mask + offset;
+
         return center;
     }
 
