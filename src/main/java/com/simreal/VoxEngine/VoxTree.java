@@ -136,7 +136,10 @@ public class VoxTree {
     }
 
 
+    /*
     private long setSubVoxel(int parentIndex, int x0, int y0, int z0, int x1, int y1, int z1, Point3i voxel, long color){
+        // TODO: REPLACE ENTIRELY
+
         int xm = (x0 + x1) >> 1;
         int ym = (y0 + y1) >> 1;
         int zm = (z0 + z1) >> 1;
@@ -253,7 +256,7 @@ public class VoxTree {
 
         return Node.color(nodeArray[parentIndex]);
     }
-
+    */
 
 
     public void setVoxelPoint(Point3i voxel, int color){
@@ -265,23 +268,53 @@ public class VoxTree {
             || (voxel.z > farBottomRight.z) ){
             return;
         }
-
-        setSubVoxel(0, (int) nearTopLeft.x, (int) nearTopLeft.y, (int) nearTopLeft.z, (int) farBottomRight.x, (int) farBottomRight.y, (int) farBottomRight.z, voxel, color);
+        long path = Path.fromPosition(voxel, this.edgeLength, depth);
+        setVoxelPath(path, color);
     }
+
 
     public void setVoxelPath(long path, int color) {
         int nodeIndex = getIndexForPath(path);
         System.out.println("Set " + Path.toString(path) + " (" + nodeIndex + ") to " + Color.toString(color));
         nodeArray[nodeIndex] = Node.setColor(nodeArray[nodeIndex], color);
+
+        // TODO: Update the aggregate colors in the parents
     }
 
     public int getIndexForPath(long path) {
         int depth = Path.depth(path);
         int nodeIndex = 0;
         long node;
+        long childNode;
         for (int cnt=0; cnt<depth; ++cnt) {
             node = nodeArray[nodeIndex];
-            nodeIndex = Node.child(node) + Path.child(path, cnt);
+
+            // Subdivide if we hit a leaf before the bottom
+            // TODO: Maintain a free-node list
+            if (Node.isLeaf(node)){
+                childNode = Node.setDepth(node, (byte)(cnt + 1));
+
+                node = Node.setLeaf(node, false);
+                node = Node.setChild(node, firstFreeNode);
+                nodeArray[nodeIndex] = node;
+                nodeIndex = firstFreeNode;
+
+                // TODO: Don't double-set the actual child
+                // Fill in the new tile with leaf children
+                nodeArray[nodeIndex] = childNode;
+                nodeArray[nodeIndex+1] = childNode;
+                nodeArray[nodeIndex+2] = childNode;
+                nodeArray[nodeIndex+3] = childNode;
+                nodeArray[nodeIndex+4] = childNode;
+                nodeArray[nodeIndex+5] = childNode;
+                nodeArray[nodeIndex+6] = childNode;
+                nodeArray[nodeIndex+7] = childNode;
+
+                // TODO: Operate with the free-node list, including bounds checking
+                firstFreeNode += 8;
+            } else {
+                nodeIndex = Node.child(node) + Path.child(path, cnt);
+            }
         }
         return nodeIndex;
     }

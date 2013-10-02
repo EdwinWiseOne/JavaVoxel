@@ -106,7 +106,94 @@ public class Path {
      * @return
      */
     public static long fromPosition(Point3i position, int edgeLength, int depth) {
+        if ( (position.x < 0)
+                || (position.y < 0)
+                || (position.z < 0)
+                || (position.x > edgeLength)
+                || (position.y > edgeLength)
+                || (position.z > edgeLength) ){
+            return 0L;
+        }
 
+        int x0 = 0;
+        int y0 = 0;
+        int z0 = 0;
+        int x1 = edgeLength;
+        int y1 = edgeLength;
+        int z1 = edgeLength;
+
+        int xm;
+        int ym;
+        int zm ;
+
+        long path = 0L;
+        int sub;
+
+        for (int level=0; level<depth; ++level) {
+            xm = (x0 + x1) >> 1;
+            ym = (y0 + y1) >> 1;
+            zm = (z0 + z1) >> 1;
+
+            // Which sub-voxel are we in, based on position relative to midpoints;
+            // we know we are in the parent voxel already
+            sub = 0;
+            if (position.z > zm){
+                sub |= 1;
+            }
+            if (position.y > ym){
+                sub |= 2;
+            }
+            if (position.x > xm){
+                sub |= 4;
+            }
+            path = Path.addChild(path, sub);
+
+            // Reconfigure to the sub-voxel
+            switch (sub){
+                case 0:
+                    x1 = xm;
+                    y1 = ym;
+                    z1 = zm;
+                    break;
+                case 1:
+                    z0 = zm;
+                    x1 = xm;
+                    y1 = ym;
+                    break;
+                case 2:
+                    y0 = ym;
+                    x1 = xm;
+                    z1 = zm;
+                    break;
+                case 3:
+                    y0 = ym;
+                    z0 = zm;
+                    x1 = xm;
+                    break;
+                case 4:
+                    x0 = xm;
+                    y1 = ym;
+                    z1 = zm;
+                    break;
+                case 5:
+                    x0 = xm;
+                    z0 = zm;
+                    y1 = ym;
+                    break;
+                case 6:
+                    x0 = xm;
+                    x1 = xm;
+                    z1 = zm;
+                    break;
+                case 7:
+                    x0 = xm;
+                    y0 = ym;
+                    z0 = zm;
+                    break;
+            }
+        }
+
+        return path;
     }
 
 
@@ -154,7 +241,7 @@ public class Path {
      * @return
      */
     public static long toID(long path) {
-
+        return 0L;
     }
 
     static String toString(long path){
