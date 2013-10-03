@@ -33,6 +33,7 @@ class Node {
     private static final long NODE_ALPHA_MASK       = 0x00000000FF000000L;
     private static final long NODE_CHILD_MASK       = 0x00FFFFFF00000000L;
     private static final long NODE_FLAG_LEAF_MASK   = 0x0100000000000000L;
+    private static final long NODE_FLAG_USED_MASK   = 0x0200000000000000L;
     private static final long NODE_DEPTH_MASK       = 0xF000000000000000L;
 
     private static final byte NODE_RGBA_SHIFT       = 0;
@@ -92,6 +93,17 @@ class Node {
 
     static boolean isLeaf(long node){
         return (node & NODE_FLAG_LEAF_MASK) == NODE_FLAG_LEAF_MASK;
+    }
+
+    static long setUsed(long node, boolean used){
+        if (used){
+            return (node | NODE_FLAG_USED_MASK);
+        }
+        return (node & ~NODE_FLAG_USED_MASK);
+    }
+
+    static boolean isUsed(long node){
+        return (node & NODE_FLAG_USED_MASK) == NODE_FLAG_USED_MASK;
     }
 
     static long setDepth(long node, byte depth){
