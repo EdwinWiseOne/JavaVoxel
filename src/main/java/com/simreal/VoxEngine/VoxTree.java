@@ -108,6 +108,7 @@ public class VoxTree {
         // --------------------------------------
         // Define the world cube
         // --------------------------------------
+        // TODO: use the world cube dimensions explicitly in Path
         nearTopLeft = new Point3d(0, 0, 0);
         farBottomRight = new Point3d(edgeLength, edgeLength, edgeLength);
 
@@ -191,15 +192,39 @@ public class VoxTree {
         System.out.println("Set " + Path.toString(path) + " (" + nodeIndex + ") to " + Color.toString(color));
         nodePool[nodeIndex] = Node.setColor(nodePool[nodeIndex], color);
 
+        int depth = Path.depth(path);
+        //path = Path.setDepth(path, depth-1);
+        refineVoxelPath(path);
+    }
+
+    private long splitVoxel(int nodeIndex) {
+        long node = nodePool[nodeIndex];
+        long childNode = Node.setDepth(node, (byte)(Node.depth(node)+1));
+
+        System.out.println("Split: populating " + nodeIndex);
+
+        for (int idx=0; idx<8; ++idx) {
+            int childIndex = getFreeNodeIndex();
+            if (idx == 0) {
+                node = Node.setChild(Node.setLeaf(node, false), childIndex);
+                nodePool[nodeIndex] = node;
+            }
+            nodePool[childIndex] = childNode;
+        }
+        return node;
+    }
+
+    public void refineVoxelPath(long path) {
         boolean merge = true;
         int depth = Path.depth(path);
+
         for (int level=depth-1; level >= 0; --level) {
             path = Path.setDepth(path, level);
-            merge &= refineVoxelPath(path, merge);
+            merge &= refineVoxel(path, merge);
         }
     }
 
-    private boolean refineVoxelPath(long path, boolean allowMerge) {
+    private boolean refineVoxel(long path, boolean allowMerge) {
         int nodeIndex = getIndexForPath(path);
 
         long parentNode = nodePool[nodeIndex];
@@ -217,6 +242,8 @@ public class VoxTree {
         }
 
         if (merge && allowMerge) {
+            System.out.println("Refine: trimming " + nodeIndex);
+
             nodePool[nodeIndex] = Node.setLeaf(Node.setColor(parentNode, color), true);
             for (int idx=7; idx>=0; --idx) {
                 putFreeNodeIndex(childIndex + idx);
@@ -251,17 +278,7 @@ public class VoxTree {
 
             // Subdivide if we hit a leaf before the bottom
             if (Node.isLeaf(node)){
-                childNode = Node.setDepth(node, (byte)(cnt + 1));
-
-                node = Node.setLeaf(node, false);
-                for (int idx=0; idx<8; ++idx) {
-                    int childIndex = getFreeNodeIndex();
-                    if (idx == 0) {
-                        node = Node.setChild(node, childIndex);
-                        nodePool[nodeIndex] = node;
-                    }
-                    nodePool[childIndex] = childNode;
-                }
+                node = splitVoxel(nodeIndex);
             }
             nodeIndex = Node.child(node) + Path.child(path, cnt);
         }
@@ -356,12 +373,28 @@ public class VoxTree {
 
             // Child...
             long node = nodePool[state.nodeIndex];
+            if ( Node.isLeaf(node)
+                    && pick
+                    && (Node.depth(node) < depth)) {
+
+                double tmin = Math.max(state.t0.x, Math.max(state.t0.y, state.t0.z));
+
+                if (tmin <= PICK_DEPTH) {
+                    // If picking, we must traverse to the very bottom...
+                    node = splitVoxel(state.nodeIndex);
+                    nodePool[state.nodeIndex] = node;
+                }
+
+            }
+
             if (Node.isLeaf(node)) {
                 // ... value
                 long newRgba = Node.color(node);
                 if (newRgba > 0) {
                     if (pick) {
                         double tmin = Math.max(state.t0.x, Math.max(state.t0.y, state.t0.z));
+
+                        int prevPickNodeIndex = pickNodeIndex;
 
                         if (tmin > PICK_DEPTH) {
                             pickNodeIndex = 0;
@@ -371,12 +404,17 @@ public class VoxTree {
                                 pickNodePath = state.nodePath;
                                 pickNodeIndex = state.nodeIndex;
                                 pickFacet = facet;
-//                                pickRay.set(ray);
 
                                 int index = getIndexForPath(pickNodePath);
                                 //System.out.println("Picked " + pickNodeIndex + " -> " + Path.toString(pickNodePath) + " -> " + index);
                             }
                         }
+                        if ((prevPickNodeIndex != 0) && (pickNodeIndex != prevPickNodeIndex)) {
+                            refineVoxelPath(pickNodePath);
+                        }
+
+                        // TODO: Refine the parent path of the previously picked node, to possibly reverse
+                        // any splitting we did to pick...
 
                         return 0;
                     }

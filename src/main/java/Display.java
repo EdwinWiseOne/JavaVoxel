@@ -61,8 +61,14 @@ public class Display extends Canvas implements Runnable {
                 tree.setVoxelPoint(new Point3i((x*stride)+offset, 0, (y*stride)+offset), (int)Color.setColor(30,30,30,255));
             }
         }
-        //Corner blue voxel
-        tree.setVoxelPoint(new Point3i(0, (1*stride)+offset, 0), (int) Color.setColor(0, 0, 192, 255));
+        //Corner blue voxel fully populated cube
+        tree.setVoxelPoint(new Point3i((0*stride)+offset, (0*stride)+offset, (0*stride)+offset), (int) Color.setColor(0, 0, 192, 255));
+        tree.setVoxelPoint(new Point3i((0*stride)+offset, (0*stride)+offset, (1*stride)+offset), (int) Color.setColor(0, 0, 192, 255));
+        tree.setVoxelPoint(new Point3i((0*stride)+offset, (1*stride)+offset, (0*stride)+offset), (int) Color.setColor(0, 0, 192, 255));
+        tree.setVoxelPoint(new Point3i((0*stride)+offset, (1*stride)+offset, (1*stride)+offset), (int) Color.setColor(0, 0, 192, 255));
+        tree.setVoxelPoint(new Point3i((1*stride)+offset, (0*stride)+offset, (0*stride)+offset), (int) Color.setColor(0, 0, 192, 255));
+        tree.setVoxelPoint(new Point3i((1*stride)+offset, (0*stride)+offset, (1*stride)+offset), (int) Color.setColor(0, 0, 192, 255));
+        tree.setVoxelPoint(new Point3i((1*stride)+offset, (1*stride)+offset, (0*stride)+offset), (int) Color.setColor(0, 0, 192, 255));
         tree.setVoxelPoint(new Point3i((1*stride)+offset, (1*stride)+offset, (1*stride)+offset), (int) Color.setColor(0, 0, 192, 255));
 
         System.out.println("Spread: " + spread);
