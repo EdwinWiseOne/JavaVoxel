@@ -11,6 +11,23 @@ public class VoxTreeTest {
 
     private VoxTree tree;
 
+    @BeforeMethod
+    private void initTree() {
+        tree = new VoxTree(DEPTH);
+    }
+
+    @Test
+    public void testConstruction() {
+        Assert.assertEquals(tree.depth, DEPTH);
+        Assert.assertEquals(tree.edgeLength, (1<<DEPTH) * VoxTree.BRICK_EDGE);
+        Assert.assertEquals(tree.stride(), VoxTree.BRICK_EDGE);
+        Assert.assertEquals(tree.firstFreeNodeIndex, 1);
+
+        VoxTree.VoxTreeStatistics stats = tree.analyze();
+        Assert.assertEquals(stats.numLeaves, 1);
+        Assert.assertEquals(stats.numNodes, 0);
+    }
+
     @DataProvider(name = "insertion")
     private Object[][][] insertionData() {
         return new Object[][][][] {
@@ -32,14 +49,14 @@ public class VoxTreeTest {
                 {
                         {
                                 // X, Y, Z, Leaves, Nodes
-                                { 0x100 + 8, 0x100 + 8, 0x100 + 8, 29, 4 },
-                                { 0x100 + 8, 0x100 + 8, 0x110 + 8, 29, 4 },
-                                { 0x100 + 8, 0x110 + 8, 0x100 + 8, 29, 4 },
-                                { 0x100 + 8, 0x110 + 8, 0x110 + 8, 29, 4 },
-                                { 0x110 + 8, 0x100 + 8, 0x100 + 8, 29, 4 },
-                                { 0x110 + 8, 0x100 + 8, 0x110 + 8, 29, 4 },
-                                { 0x110 + 8, 0x110 + 8, 0x100 + 8, 29, 4 },
-                                { 0x110 + 8, 0x110 + 8, 0x110 + 8, 29, 4 },
+                                { 0xC0 + 8, 0xC0 + 8, 0xC0 + 8, 29, 4 },
+                                { 0xC0 + 8, 0xC0 + 8, 0xD0 + 8, 50, 7 },
+                                { 0xC0 + 8, 0xD0 + 8, 0xC0 + 8, 64, 9 },
+                                { 0xC0 + 8, 0xD0 + 8, 0xD0 + 8, 64, 9 },
+                                { 0xD0 + 8, 0xC0 + 8, 0xC0 + 8, 64, 9 },
+                                { 0xD0 + 8, 0xC0 + 8, 0xD0 + 8, 64, 9 },
+                                { 0xD0 + 8, 0xD0 + 8, 0xC0 + 8, 64, 9 },
+                                { 0xD0 + 8, 0xD0 + 8, 0xD0 + 8, 64, 9 },
                         },
                 },
                 // Split open two cubes
@@ -52,24 +69,6 @@ public class VoxTreeTest {
                 },
         };
     }
-
-    @BeforeTest
-    private void initTree() {
-        tree = new VoxTree(DEPTH);
-    }
-
-    @Test
-    public void testConstruction() {
-        Assert.assertEquals(tree.depth, DEPTH);
-        Assert.assertEquals(tree.edgeLength, (1<<DEPTH) * VoxTree.BRICK_EDGE);
-        Assert.assertEquals(tree.stride(), VoxTree.BRICK_EDGE);
-        Assert.assertEquals(tree.firstFreeNodeIndex, 1);
-
-        VoxTree.VoxTreeStatistics stats = tree.analyze();
-        Assert.assertEquals(stats.numLeaves, 1);
-        Assert.assertEquals(stats.numNodes, 0);
-    }
-
     @Test(dataProvider = "insertion")
     public void testInsertion(Object[][] details) {
         int test = details.length;

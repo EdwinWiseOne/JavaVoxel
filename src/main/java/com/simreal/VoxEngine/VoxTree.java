@@ -169,128 +169,6 @@ public class VoxTree {
         firstFreeNodeIndex = nodeIndex;
     }
 
-    /*
-    private long setSubVoxel(int parentIndex, int x0, int y0, int z0, int x1, int y1, int z1, Point3i voxel, long color){
-        // TODO: REPLACE ENTIRELY
-
-        int xm = (x0 + x1) >> 1;
-        int ym = (y0 + y1) >> 1;
-        int zm = (z0 + z1) >> 1;
-
-        long parentNode = nodePool[parentIndex];
-        int depth = Node.depth(parentNode);
-
-        // If we've reached the bottom of the tree, set the node and exit
-        if (depth == this.depth){
-            nodePool[parentIndex] = Node.setColor(parentNode, color);
-            return color;
-        }
-
-        // Which child are we in, based on position relative to midpoints;
-        // we know we are in the parent voxel already
-        int sub = 0;
-        if (voxel.z > zm){
-            sub |= 1;
-        }
-        if (voxel.y > ym){
-            sub |= 2;
-        }
-        if (voxel.x > xm){
-            sub |= 4;
-        }
-
-        // Break leaf into a node
-        // TODO: Maintain a free-node list
-        int child;
-        if (Node.isLeaf(parentNode)){
-            long childNode = Node.setDepth(parentNode, (byte) (depth + 1));
-
-            parentNode = Node.setLeaf(parentNode, false);
-            parentNode = Node.setChild(parentNode, firstFreeNodeIndex);
-
-            // TODO: Don't double-set our actual child
-            child = firstFreeNodeIndex;
-            nodePool[firstFreeNodeIndex] = childNode;
-            nodePool[firstFreeNodeIndex+1] = childNode;
-            nodePool[firstFreeNodeIndex+2] = childNode;
-            nodePool[firstFreeNodeIndex+3] = childNode;
-            nodePool[firstFreeNodeIndex+4] = childNode;
-            nodePool[firstFreeNodeIndex+5] = childNode;
-            nodePool[firstFreeNodeIndex+6] = childNode;
-            nodePool[firstFreeNodeIndex+7] = childNode;
-
-            firstFreeNodeIndex += 8; // TODO: BOUNDS CHECKING!
-        } else {
-            child = Node.child(parentNode);
-        }
-
-        // Descend to children
-        switch (sub){
-            case 0:
-                color = setSubVoxel(child, x0, y0, z0, xm, ym, zm, voxel, color);
-                break;
-            case 1:
-                color = setSubVoxel(child + 1, x0, y0, zm, xm, ym, z1, voxel, color);
-                break;
-            case 2:
-                color = setSubVoxel(child + 2, x0, ym, z0, xm, y1, zm, voxel, color);
-                break;
-            case 3:
-                color = setSubVoxel(child + 3, x0, ym, zm, xm, y1, z1, voxel, color);
-                break;
-            case 4:
-                color = setSubVoxel(child + 4, xm, y0, z0, x1, ym, zm, voxel, color);
-                break;
-            case 5:
-                color = setSubVoxel(child + 5, xm, y0, zm, x1, ym, z1, voxel, color);
-                break;
-            case 6:
-                color = setSubVoxel(child + 6, xm, ym, z0, x1, y1, zm, voxel, color);
-                break;
-            case 7:
-                color = setSubVoxel(child + 7, xm, ym, zm, x1, y1, z1, voxel, color);
-                break;
-        }
-
-        // If all children are the same color, coalesce into this parent
-        boolean merge = true;
-        for (int idx=0; idx<8; ++idx){
-            long node = nodePool[child+idx];
-            if (color != Node.color(node)) {
-                merge = false;
-                break;
-            }
-        }
-
-        if (merge) {
-
-        } else {
-            // Accumulate child colors
-            long red = 0;
-            long green = 0;
-            long blue = 0;
-            long alpha = 0;
-            for (int idx=0; idx<8; ++idx){
-                if (idx == sub){
-                    red += Color.red(color);
-                    green += Color.green(color);
-                    blue += Color.blue(color);
-                    alpha += Color.alpha(color);
-                } else {
-                    long node = nodePool[child+idx];
-                    red += Node.red(node);
-                    green += Node.green(node);
-                    blue += Node.blue(node);
-                    alpha += Node.alpha(node);
-                }
-            }
-            nodePool[parentIndex] = Node.setColor(parentNode, (int) (red >>> 3), (int) (green >>> 3), (int) (blue >>> 3), (int) (alpha >>> 3));
-        }
-
-        return Node.color(nodePool[parentIndex]);
-    }
-    */
-
 
     public void setVoxelPoint(Point3i voxel, int color){
         if ( (voxel.x < nearTopLeft.x)
@@ -311,7 +189,51 @@ public class VoxTree {
         System.out.println("Set " + Path.toString(path) + " (" + nodeIndex + ") to " + Color.toString(color));
         nodePool[nodeIndex] = Node.setColor(nodePool[nodeIndex], color);
 
-        // TODO: Update the aggregate colors in the parents
+        int depth = Path.depth(path);
+        for (int level=depth-2; level >= 0; --level) {
+            path = Path.setDepth(path, level);
+            refineVoxelPath(path);
+        }
+    }
+
+    private void refineVoxelPath(long path) {
+        int nodeIndex = getIndexForPath(path);
+
+        long parentNode = nodePool[nodeIndex];
+        int childIndex = Node.child(parentNode);
+
+        // If all children are the same color, coalesce into this parent
+        long color = Node.color(nodePool[childIndex]);
+        boolean merge = true;
+        for (int idx=1; idx<8; ++idx){
+            long node = nodePool[childIndex+idx];
+            if (color != Node.color(node)) {
+                merge = false;
+                break;
+            }
+        }
+
+        if (merge) {
+            nodePool[nodeIndex] = Node.setLeaf(Node.setColor(parentNode, color), true);
+            for (int idx=7; idx>=0; --idx) {
+                putFreeNode(childIndex + idx);
+            }
+        } else {
+            // Accumulate child colors
+            long red = 0;
+            long green = 0;
+            long blue = 0;
+            long alpha = 0;
+            for (int idx=0; idx<8; ++idx){
+                long node = nodePool[childIndex+idx];
+                red += Node.red(node);
+                green += Node.green(node);
+                blue += Node.blue(node);
+                alpha += Node.alpha(node);
+            }
+            nodePool[nodeIndex] = Node.setColor(parentNode, (int) (red >>> 3), (int) (green >>> 3), (int) (blue >>> 3), (int) (alpha >>> 3));
+        }
+
     }
 
     public int getIndexForPath(long path) {
@@ -323,28 +245,18 @@ public class VoxTree {
             node = nodePool[nodeIndex];
 
             // Subdivide if we hit a leaf before the bottom
-            // TODO: Maintain a free-node list
             if (Node.isLeaf(node)){
                 childNode = Node.setDepth(node, (byte)(cnt + 1));
 
                 node = Node.setLeaf(node, false);
-                node = Node.setChild(node, firstFreeNodeIndex);
-                nodePool[nodeIndex] = node;
-                nodeIndex = firstFreeNodeIndex;
-
-                // TODO: Don't double-set the actual child
-                // Fill in the new tile with leaf children
-                nodePool[nodeIndex] = childNode;
-                nodePool[nodeIndex+1] = childNode;
-                nodePool[nodeIndex+2] = childNode;
-                nodePool[nodeIndex+3] = childNode;
-                nodePool[nodeIndex+4] = childNode;
-                nodePool[nodeIndex+5] = childNode;
-                nodePool[nodeIndex+6] = childNode;
-                nodePool[nodeIndex+7] = childNode;
-
-                // TODO: Operate with the free-node list, including bounds checking
-                firstFreeNodeIndex += 8;
+                for (int idx=0; idx<8; ++idx) {
+                    int childIndex = getFreeNode();
+                    if (idx == 0) {
+                        node = Node.setChild(node, firstFreeNodeIndex);
+                        nodePool[nodeIndex] = node;
+                    }
+                    nodePool[childIndex] = childNode;
+                }
             } else {
                 nodeIndex = Node.child(node) + Path.child(path, cnt);
             }

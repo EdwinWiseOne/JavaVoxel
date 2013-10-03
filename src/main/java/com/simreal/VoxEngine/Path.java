@@ -157,38 +157,38 @@ public class Path {
                     break;
                 case 1:
                     z0 = zm;
-                    y1 = xm;
-                    x1 = ym;
+                    y1 = ym;
+                    x1 = xm;
                     break;
                 case 2:
-                    z1 = ym;
-                    y0 = xm;
-                    x1 = zm;
+                    z1 = zm;
+                    y0 = ym;
+                    x1 = xm;
                     break;
                 case 3:
-                    z0 = ym;
-                    y0 = zm;
+                    z0 = zm;
+                    y0 = ym;
                     x1 = xm;
                     break;
                 case 4:
-                    z1 = xm;
+                    z1 = zm;
                     y1 = ym;
-                    x0 = zm;
+                    x0 = xm;
                     break;
                 case 5:
-                    z0 = xm;
-                    y1 = zm;
-                    x0 = ym;
+                    z0 = zm;
+                    y1 = ym;
+                    x0 = xm;
                     break;
                 case 6:
-                    z1 = xm;
-                    y0 = xm;
-                    x0 = zm;
+                    z1 = zm;
+                    y0 = ym;
+                    x0 = xm;
                     break;
                 case 7:
-                    z0 = xm;
+                    z0 = zm;
                     y0 = ym;
-                    x0 = zm;
+                    x0 = xm;
                     break;
             }
         }
@@ -206,37 +206,72 @@ public class Path {
      * @return
      */
     public static Point3i toPosition(long path, int edgeLength) {
-        int offset = edgeLength >> 1;
-        Point3i center = new Point3i(offset, offset, offset);
+        int x0 = 0;
+        int y0 = 0;
+        int z0 = 0;
+        int x1 = edgeLength;
+        int y1 = edgeLength;
+        int z1 = edgeLength;
+
+        int xm=0;
+        int ym=0;
+        int zm=0;
 
         int depth = Path.depth(path);
         for (int cnt=0; cnt<depth; ++cnt) {
-            int child = Path.child(path, cnt);
+            xm = (x0 + x1) >> 1;
+            ym = (y0 + y1) >> 1;
+            zm = (z0 + z1) >> 1;
 
-            offset >>= 1;
-            if ((child & Z_AXIS) == 0) {
-                center.z -= offset;
-            } else {
-                center.z += offset;
-            }
-            if ((child & X_AXIS) == 0) {
-                center.x -= offset;
-            } else {
-                center.x += offset;
-            }
-            if ((child & Y_AXIS) == 0) {
-                center.y -= offset;
-            } else {
-                center.y += offset;
+            switch (Path.child(path, cnt)){
+                case 0:
+                    z1 = zm;
+                    y1 = ym;
+                    x1 = xm;
+                    break;
+                case 1:
+                    z0 = zm;
+                    y1 = ym;
+                    x1 = xm;
+                    break;
+                case 2:
+                    z1 = zm;
+                    y0 = ym;
+                    x1 = xm;
+                    break;
+                case 3:
+                    z0 = zm;
+                    y0 = ym;
+                    x1 = xm;
+                    break;
+                case 4:
+                    z1 = zm;
+                    y1 = ym;
+                    x0 = xm;
+                    break;
+                case 5:
+                    z0 = zm;
+                    y1 = ym;
+                    x0 = xm;
+                    break;
+                case 6:
+                    z1 = zm;
+                    y0 = ym;
+                    x0 = xm;
+                    break;
+                case 7:
+                    z0 = zm;
+                    y0 = ym;
+                    x0 = xm;
+                    break;
             }
         }
         // Enforce position to middle of voxel
-        int mask = ~((offset << 1) - 1);
-        center.x &= mask + offset;
-        center.y &= mask + offset;
-        center.z &= mask + offset;
+        xm = (x0 + x1) >> 1;
+        ym = (y0 + y1) >> 1;
+        zm = (z0 + z1) >> 1;
 
-        return center;
+        return new Point3i(xm, ym, zm);
     }
 
     /**

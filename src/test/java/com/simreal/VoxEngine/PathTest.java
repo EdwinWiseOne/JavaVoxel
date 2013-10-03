@@ -67,7 +67,7 @@ public class PathTest {
                 { 4, new Point3i(3, 3, 3),      0x0070000000000004L},
                 { 4, new Point3i(31, 31, 31),   0xFFF0000000000004L},
                 { 4, new Point3i(17, 17, 1),    0xC000000000000004L},
-                { 4, new Point3i(27, 7, 15),    0x9740000000000004L}
+                { 4, new Point3i(27, 7, 15),    0x95F0000000000004L}
         };
     }
     @Test(dataProvider = "fromPosition")
@@ -85,7 +85,7 @@ public class PathTest {
                 { 4, 32, 0xFFF0000000000004L, new Point3i(31,31,31)},
                 { 4, 32, 0xC000000000000004L, new Point3i(17, 17, 1)},
                 { 4, 64, 0xC000000000000004L, new Point3i(34, 34, 2)},
-                { 4, 32, 0x9740000000000004L, new Point3i(27, 7, 15)}
+                { 4, 32, 0x95F0000000000004L, new Point3i(27, 7, 15)}
         };
     }
     @Test(dataProvider = "toPosition")
@@ -104,9 +104,9 @@ public class PathTest {
 
         // Random test position/path round trips
         for (int cnt=0; cnt<num; ++cnt) {
-            int x = rand.nextInt(edge) & ~1 + 1;
-            int y = rand.nextInt(edge) & ~1 + 1;
-            int z = rand.nextInt(edge) & ~1 + 1;
+            int x = (rand.nextInt(edge) & ~1) + 1;
+            int y = (rand.nextInt(edge) & ~1) + 1;
+            int z = (rand.nextInt(edge) & ~1) + 1;
             Point3i position = new Point3i(x,y,z);
 
             long path = Path.fromPosition(position, edge, depth);
