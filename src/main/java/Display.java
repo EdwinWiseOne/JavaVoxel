@@ -1,20 +1,17 @@
 
-import javax.swing.*;
+import com.simreal.VoxEngine.Color;
+import com.simreal.VoxEngine.VoxTree;
+
+import javax.swing.JFrame;
 import javax.vecmath.Point3d;
 import javax.vecmath.Point3i;
 import javax.vecmath.Vector3d;
-
-import java.awt.*;
+import java.awt.Canvas;
+import java.awt.Graphics;
 import java.awt.image.BufferStrategy;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.util.Random;
-
-import com.simreal.VoxEngine.VoxTree;
-import com.simreal.VoxEngine.Color;
-
-// TODO: Move over to Maven for builds
-// TODO: Add Unit Tests via TestNG
 
 
 public class Display extends Canvas implements Runnable {
