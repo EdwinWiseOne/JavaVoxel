@@ -3,79 +3,124 @@ package com.simreal.VoxEngine;
 import org.testng.Assert;
 import org.testng.annotations.*;
 
+import javax.vecmath.Point3i;
+import java.util.Random;
+
 public class PathTest {
 
-    @DataProvider(name = "paths")
-    private Object[][][] createPath1() {
-        return new Object[][][][] {
+    @DataProvider(name = "addChild")
+    private Object[][] addChildData() {
+        return new Object[][][] {
                 {
-                        {
-                                // choice, depth
-                                { 4, 1 },
-                                { 2, 2 },
-                                { 0, 3 },
-                                { 7, 4 },
-                                { 15, 5 },
-                        }
+                        new Integer[] { 4, 2, 0, 7, 15}
                 },
                 {
-                        {
-                                // choice, depth
-                                {  3, 1 },
-                                {  2, 2 },
-                                {  0, 3 },
-                                {  7, 4 },
-                                { 15, 5 },
-                                {  3, 6 },
-                                {  2, 7 },
-                                {  0, 8 },
-                                {  7, 9 },
-                                { 15, 10 },
-                                {  3, 11 },
-                                {  2, 12 },
-                                {  0, 13 },
-                                {  7, 14 },
-                                { 15, 15 },
-                                {  3, 15 },
-                                {  2, 15 },
-                        },
+                        new Integer[] { 3, 2, 0, 7, 15, 3, 2, 0, 7, 15, 3, 2, 0, 7, 5, 6, 0, 1, 9, 8, 12}
                 },
                 {
-                        {
-                                // choice, depth, first choice (guard)
-                                { 0, 1 },
-                                { 0, 2 },
-                                { 0, 3 },
-                                { 4, 4 },
-                        }
+                        new Integer[] { 0, 0, 0, 0, 4}
                 }
         };
     }
-
-    @Test(dataProvider = "paths")
-    public void pathTest(Object[][] choices) {
+    @Test(dataProvider = "addChild")
+    public void addChildTest(Integer[] children) {
         long path = 0L;
+        int firstChild = 0;
 
-        Object[] choice;
-        int first = 0;
-        for (int idx=0; idx<choices.length; ++idx) {
-            choice = choices[idx];
-            int child = (Integer)choice[0];
-            int depth = (Integer)choice[1];
-            if (idx == 0) {
-                first = child;
-
+        // Build path from children choices
+        int depth = 0;
+        for (int child : children) {
+            if (path == 0L) {
+                firstChild = child;
             }
+            ++depth;
+
             // -------------------------------------------
             path = Path.addChild(path, child);
-            Assert.assertEquals(Path.depth(path), depth);
             // -------------------------------------------
 
-            depth = Path.depth(path);
+            Assert.assertEquals(Path.child(path, 0), firstChild);
             if (depth < Path.PATH_MAX_DEPTH) {
-                Assert.assertEquals(Path.child(path, depth-1), child & 0x07);
+                Assert.assertEquals(Path.depth(path), depth);
+                Assert.assertEquals(Path.child(path, depth-1), child & Path.PATH_CHILD_MASK);
+            } else {
+                Assert.assertEquals(Path.depth(path), Path.PATH_MAX_DEPTH);
             }
-            Assert.assertEquals(Path.child(path, 0), first);
+        }
+
+        // Verify all children
+        depth = 0;
+        for (int child : children) {
+            Assert.assertEquals(Path.child(path, depth), child & Path.PATH_CHILD_MASK);
+            ++depth;
+            if (depth >= Path.PATH_MAX_DEPTH) {
+                break;
+            }
         }
     }
+
+    @DataProvider(name = "fromPosition")
+    public Object[][] fromPositionData() {
+        return new Object[][]  {
+                // Voxels are 2 wide; offset to center is therefore 1
+                { 4, new Point3i(1, 1, 1),      0x0000000000000004L},
+                { 4, new Point3i(3, 3, 3),      0x0070000000000004L},
+                { 4, new Point3i(31, 31, 31),   0xFFF0000000000004L},
+                { 4, new Point3i(17, 17, 1),    0xC000000000000004L},
+                { 4, new Point3i(27, 7, 15),    0x95F0000000000004L}
+        };
+    }
+    @Test(dataProvider = "fromPosition")
+    public void fromPositionTest(int depth, Point3i position, long checkPath) {
+        int edge = 2 << depth;
+        long path = Path.fromPosition(position, edge, depth);
+        Assert.assertEquals(path, checkPath);
+    }
+
+    @DataProvider(name = "toPosition")
+    public Object[][] toPositionData() {
+        return new Object[][] {
+                { 4, 32, 0x0000000000000004L, new Point3i(1, 1, 1)},
+                { 4, 32, 0x0070000000000004L, new Point3i(3, 3, 3)},
+                { 4, 32, 0xFFF0000000000004L, new Point3i(31,31,31)},
+                { 4, 32, 0xC000000000000004L, new Point3i(17, 17, 1)},
+                { 4, 64, 0xC000000000000004L, new Point3i(34, 34, 2)},
+                { 4, 32, 0x95F0000000000004L, new Point3i(27, 7, 15)}
+        };
+    }
+    @Test(dataProvider = "toPosition")
+    public void toPositionTest(int depth, int edge, long path, Point3i checkPosition) {
+        Point3i position = Path.toPosition(path, edge);
+        Assert.assertEquals(position, checkPosition);
+    }
+
+    @Test
+    public void positionTest() {
+        int depth = 8;
+        int edge = 2 << depth;
+        int num = 1000;
+
+        Random rand = new Random();
+
+        // Random test position/path round trips
+        for (int cnt=0; cnt<num; ++cnt) {
+            int x = (rand.nextInt(edge) & ~1) + 1;
+            int y = (rand.nextInt(edge) & ~1) + 1;
+            int z = (rand.nextInt(edge) & ~1) + 1;
+            Point3i position = new Point3i(x,y,z);
+
+            long path = Path.fromPosition(position, edge, depth);
+            Point3i position2 = Path.toPosition(path, edge);
+            long path2 = Path.fromPosition(position2, edge, depth);
+
+            Assert.assertEquals(path, path2);
+            Assert.assertEquals(position, position2);
+        }
+    }
+/*
+    @Test(dataProvider = "toID")
+    public void toIDTest(long path, long ID){
+
+    }
+*/
 }

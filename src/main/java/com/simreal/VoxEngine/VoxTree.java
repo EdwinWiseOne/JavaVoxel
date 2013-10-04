@@ -44,14 +44,16 @@ public class VoxTree {
         }
     }
 
-    private static int PICK_DEPTH = 256;
+    private static final int PICK_DEPTH = 256;
+    private static final int NO_FREE_NODE_INDEX = -1;
 
     int depth;
     int numNodes;
     int edgeLength;
 
-    long[] nodeArray;
-    int firstFreeNode = 0;
+    // TODO: Encapsulate node pool to help enforce memory management
+    long[] nodePool;
+    int firstFreeNodeIndex;
 
     private Point3d nearTopLeft;
     private Point3d farBottomRight;
@@ -91,33 +93,55 @@ public class VoxTree {
         this.edgeLength = (1 << depth) * BRICK_EDGE;
         this.numNodes = 1024 * 1024;
 
-        nodeArray = new long[numNodes];
+        // --------------------------------------
+        // Initialize the node pool
+        // --------------------------------------
+        nodePool = new long[numNodes];
+        // Chain together all of the free nodes
+        for (int idx=0; idx<(numNodes-1); ++idx) {
+            nodePool[idx] = Node.setChild(0L, idx+1);
+        }
+        nodePool[numNodes-1] = Node.END_OF_FREE_NODES;
+        int nodeIndex = getFreeNodeIndex();
+        nodePool[nodeIndex] = Node.setLeaf(nodePool[nodeIndex], true);
 
+        // --------------------------------------
+        // Define the world cube
+        // --------------------------------------
+        // TODO: use the world cube dimensions explicitly in Path
         nearTopLeft = new Point3d(0, 0, 0);
         farBottomRight = new Point3d(edgeLength, edgeLength, edgeLength);
+
+        // --------------------------------------
+        // Raycast traversal data
+        // --------------------------------------
+        stateStack = new State[depth+1];
+        for (int idx=0; idx<= depth; ++idx) stateStack[idx] = new State();
+
+        state = new State();
+        newState = new State();
 
         t0 = new Point3d();
         t1 = new Point3d();
         origin = new Point3d();
         ray = new Vector3d();
 
-        nodeArray[0] = Node.setLeaf(0, true);
-        firstFreeNode = 1;
-        rand = new Random();
+        facing = new Vector3d(0.0, 0.0, 0.0);
+        facet = 0;
 
+        // --------------------------------------
+        // Picking details
+        // --------------------------------------
         pickNodePath = 0;
         pickNodeIndex = 0;
         pickFacet = 0;
         pickRay = new Vector3d();
 
-        facing = new Vector3d(0.0, 0.0, 0.0);
-        facet = 0;
+        // --------------------------------------
+        // Misc
+        // --------------------------------------
+        rand = new Random();
 
-        stateStack = new State[depth+1];
-        for (int idx=0; idx<= depth; ++idx) stateStack[idx] = new State();
-
-        state = new State();
-        newState = new State();
     }
 
     public int edgeLength(){
@@ -128,109 +152,25 @@ public class VoxTree {
         return BRICK_EDGE;
     }
 
-
-    private long setSubVoxel(int parentIndex, int x0, int y0, int z0, int x1, int y1, int z1, Point3i voxel, long color){
-        int xm = (x0 + x1) >> 1;
-        int ym = (y0 + y1) >> 1;
-        int zm = (z0 + z1) >> 1;
-
-        long parentNode = nodeArray[parentIndex];
-        int depth = Node.depth(parentNode);
-
-        if (depth == this.depth){
-            nodeArray[parentIndex] = Node.setColor(parentNode, color);
-            return color;
+    public int getFreeNodeIndex() {
+        int freeNodeIndex = firstFreeNodeIndex;
+        firstFreeNodeIndex = Node.child(nodePool[freeNodeIndex]);
+        if (firstFreeNodeIndex == Node.END_OF_FREE_NODES) {
+            firstFreeNodeIndex = NO_FREE_NODE_INDEX;
         }
-
-        // Which child are we in, based on position relative to midpoints;
-        // we know we are in the parent voxel already
-        int sub = 0;
-        if (voxel.z > zm){
-            sub |= 1;
-        }
-        if (voxel.y > ym){
-            sub |= 2;
-        }
-        if (voxel.x > xm){
-            sub |= 4;
-        }
-
-        // Break leaf into a node
-        int child;
-        if (Node.isLeaf(parentNode)){
-            long childNode = Node.setDepth(parentNode, (byte) (depth + 1));
-
-            parentNode = Node.setLeaf(parentNode, false);
-            parentNode = Node.setChild(parentNode, firstFreeNode);
-
-            // TODO: Don't double-set our actual child
-            child = firstFreeNode;
-            nodeArray[firstFreeNode] = childNode;
-            nodeArray[firstFreeNode+1] = childNode;
-            nodeArray[firstFreeNode+2] = childNode;
-            nodeArray[firstFreeNode+3] = childNode;
-            nodeArray[firstFreeNode+4] = childNode;
-            nodeArray[firstFreeNode+5] = childNode;
-            nodeArray[firstFreeNode+6] = childNode;
-            nodeArray[firstFreeNode+7] = childNode;
-
-            firstFreeNode += 8; // TODO: BOUNDS CHECKING!
-        } else {
-            child = Node.child(parentNode);
-        }
-
-        // Descend to children
-        switch (sub){
-            case 0:
-                color = setSubVoxel(child, x0, y0, z0, xm, ym, zm, voxel, color);
-                break;
-            case 1:
-                color = setSubVoxel(child + 1, x0, y0, zm, xm, ym, z1, voxel, color);
-                break;
-            case 2:
-                color = setSubVoxel(child + 2, x0, ym, z0, xm, y1, zm, voxel, color);
-                break;
-            case 3:
-                color = setSubVoxel(child + 3, x0, ym, zm, xm, y1, z1, voxel, color);
-                break;
-            case 4:
-                color = setSubVoxel(child + 4, xm, y0, z0, x1, ym, zm, voxel, color);
-                break;
-            case 5:
-                color = setSubVoxel(child + 5, xm, y0, zm, x1, ym, z1, voxel, color);
-                break;
-            case 6:
-                color = setSubVoxel(child + 6, xm, ym, z0, x1, y1, zm, voxel, color);
-                break;
-            case 7:
-                color = setSubVoxel(child + 7, xm, ym, zm, x1, y1, z1, voxel, color);
-                break;
-        }
-
-        long red = 0;
-        long green = 0;
-        long blue = 0;
-        long alpha = 0;
-        for (int idx=0; idx<8; ++idx){
-            if (idx == sub){
-                red += Color.red(color);
-                green += Color.green(color);
-                blue += Color.blue(color);
-                alpha += Color.alpha(color);
-            } else {
-                long node = nodeArray[child+idx];
-                red += Node.red(node);
-                green += Node.green(node);
-                blue += Node.blue(node);
-                alpha += Node.alpha(node);
-            }
-        }
-
-        nodeArray[parentIndex] = Node.setColor(parentNode, (int) (red >>> 3), (int) (green >>> 3), (int) (blue >>> 3), (int) (alpha >>> 3));
-
-        return Node.color(nodeArray[parentIndex]);
+        nodePool[freeNodeIndex] = Node.setUsed(nodePool[freeNodeIndex], true);
+        return freeNodeIndex;
     }
 
+    public void putFreeNodeIndex(int nodeIndex) {
+        int nextFree = firstFreeNodeIndex;
+        if (nextFree == NO_FREE_NODE_INDEX) {
+            nextFree = Node.END_OF_FREE_NODES;
+        }
+
+        nodePool[nodeIndex] = Node.setUsed(Node.setChild(0L, nextFree), false);
+        firstFreeNodeIndex = nodeIndex;
+    }
 
 
     public void setVoxelPoint(Point3i voxel, int color){
@@ -242,59 +182,107 @@ public class VoxTree {
             || (voxel.z > farBottomRight.z) ){
             return;
         }
-
-        setSubVoxel(0, (int) nearTopLeft.x, (int) nearTopLeft.y, (int) nearTopLeft.z, (int) farBottomRight.x, (int) farBottomRight.y, (int) farBottomRight.z, voxel, color);
+        long path = Path.fromPosition(voxel, this.edgeLength, depth);
+        setVoxelPath(path, color);
     }
+
 
     public void setVoxelPath(long path, int color) {
         int nodeIndex = getIndexForPath(path);
         System.out.println("Set " + Path.toString(path) + " (" + nodeIndex + ") to " + Color.toString(color));
-        nodeArray[nodeIndex] = Node.setColor(nodeArray[nodeIndex], color);
+        nodePool[nodeIndex] = Node.setColor(nodePool[nodeIndex], color);
+
+        int depth = Path.depth(path);
+        //path = Path.setDepth(path, depth-1);
+        refineVoxelPath(path);
+    }
+
+    private long splitVoxel(int nodeIndex) {
+        long node = nodePool[nodeIndex];
+        long childNode = Node.setDepth(node, (byte)(Node.depth(node)+1));
+
+        System.out.println("Split: populating " + nodeIndex);
+
+        for (int idx=0; idx<8; ++idx) {
+            int childIndex = getFreeNodeIndex();
+            if (idx == 0) {
+                node = Node.setChild(Node.setLeaf(node, false), childIndex);
+                nodePool[nodeIndex] = node;
+            }
+            nodePool[childIndex] = childNode;
+        }
+        return node;
+    }
+
+    public void refineVoxelPath(long path) {
+        boolean merge = true;
+        int depth = Path.depth(path);
+
+        for (int level=depth-1; level >= 0; --level) {
+            path = Path.setDepth(path, level);
+            merge &= refineVoxel(path, merge);
+        }
+    }
+
+    private boolean refineVoxel(long path, boolean allowMerge) {
+        int nodeIndex = getIndexForPath(path);
+
+        long parentNode = nodePool[nodeIndex];
+        int childIndex = Node.child(parentNode);
+
+        // If all children are the same color, coalesce into this parent
+        long color = Node.color(nodePool[childIndex]);
+        boolean merge = true;
+        for (int idx=1; idx<8; ++idx){
+            long node = nodePool[childIndex+idx];
+            if (color != Node.color(node)) {
+                merge = false;
+                break;
+            }
+        }
+
+        if (merge && allowMerge) {
+            System.out.println("Refine: trimming " + nodeIndex);
+
+            nodePool[nodeIndex] = Node.setLeaf(Node.setColor(parentNode, color), true);
+            for (int idx=7; idx>=0; --idx) {
+                putFreeNodeIndex(childIndex + idx);
+            }
+            return true;
+        }
+
+        // Accumulate child colors
+        long red = 0;
+        long green = 0;
+        long blue = 0;
+        long alpha = 0;
+        for (int idx=0; idx<8; ++idx){
+            long node = nodePool[childIndex+idx];
+            red += Node.red(node);
+            green += Node.green(node);
+            blue += Node.blue(node);
+            alpha += Node.alpha(node);
+        }
+        nodePool[nodeIndex] = Node.setColor(parentNode, (int) (red >>> 3), (int) (green >>> 3), (int) (blue >>> 3), (int) (alpha >>> 3));
+
+        return false;
     }
 
     public int getIndexForPath(long path) {
         int depth = Path.depth(path);
         int nodeIndex = 0;
         long node;
+        long childNode;
         for (int cnt=0; cnt<depth; ++cnt) {
-            node = nodeArray[nodeIndex];
+            node = nodePool[nodeIndex];
+
+            // Subdivide if we hit a leaf before the bottom
+            if (Node.isLeaf(node)){
+                node = splitVoxel(nodeIndex);
+            }
             nodeIndex = Node.child(node) + Path.child(path, cnt);
         }
         return nodeIndex;
-    }
-
-    public Point3i getVoxelPoint(long path) {
-        int offset = edgeLength >> 1;
-        Point3i center = new Point3i(offset, offset, offset);
-
-        int depth = Path.depth(path);
-        int nodeIndex = 0;
-        long node;
-        for (int cnt=0; cnt<depth; ++cnt) {
-            int child = Path.child(path, cnt);
-
-            offset >>= 1;
-            if ((child & XY_PLANE) == 0) {
-                center.z -= offset;
-            } else {
-                center.z += offset;
-            }
-            if ((child & YZ_PLANE) == 0) {
-                center.x -= offset;
-            } else {
-                center.x += offset;
-            }
-            if ((child & XZ_PLANE) == 0) {
-                center.y -= offset;
-            } else {
-                center.y += offset;
-            }
-
-            node = nodeArray[nodeIndex];
-            nodeIndex = Node.child(node) + Path.child(path, cnt);
-        }
-        return center;
-
     }
 
 
@@ -384,13 +372,29 @@ public class VoxTree {
             state.set(stateStack[--stateStackTop]);
 
             // Child...
-            long node = nodeArray[state.nodeIndex];
+            long node = nodePool[state.nodeIndex];
+            if ( Node.isLeaf(node)
+                    && pick
+                    && (Node.depth(node) < depth)) {
+
+                double tmin = Math.max(state.t0.x, Math.max(state.t0.y, state.t0.z));
+
+                if (tmin <= PICK_DEPTH) {
+                    // If picking, we must traverse to the very bottom...
+                    node = splitVoxel(state.nodeIndex);
+                    nodePool[state.nodeIndex] = node;
+                }
+
+            }
+
             if (Node.isLeaf(node)) {
                 // ... value
                 long newRgba = Node.color(node);
                 if (newRgba > 0) {
                     if (pick) {
                         double tmin = Math.max(state.t0.x, Math.max(state.t0.y, state.t0.z));
+
+                        int prevPickNodeIndex = pickNodeIndex;
 
                         if (tmin > PICK_DEPTH) {
                             pickNodeIndex = 0;
@@ -400,12 +404,17 @@ public class VoxTree {
                                 pickNodePath = state.nodePath;
                                 pickNodeIndex = state.nodeIndex;
                                 pickFacet = facet;
-//                                pickRay.set(ray);
 
                                 int index = getIndexForPath(pickNodePath);
                                 //System.out.println("Picked " + pickNodeIndex + " -> " + Path.toString(pickNodePath) + " -> " + index);
                             }
                         }
+                        if ((prevPickNodeIndex != 0) && (pickNodeIndex != prevPickNodeIndex)) {
+                            refineVoxelPath(pickNodePath);
+                        }
+
+                        // TODO: Refine the parent path of the previously picked node, to possibly reverse
+                        // any splitting we did to pick...
 
                         return 0;
                     }
@@ -561,11 +570,13 @@ public class VoxTree {
 
     class VoxTreeStatistics {
         public int depth;
+        public int numUsed;
         public int numNodes;
         public int numLeaves;
 
         VoxTreeStatistics() {
             depth = 0;
+            numUsed = 0;
             numNodes = 0;
             numLeaves = 0;
         }
@@ -574,11 +585,14 @@ public class VoxTree {
     VoxTreeStatistics analyze() {
         VoxTreeStatistics stats = new VoxTreeStatistics();
 
-        for (int idx=0; idx<firstFreeNode; ++idx){
-            if (Node.isLeaf(nodeArray[idx]))
-                ++stats.numLeaves;
-            else
-                ++stats.numNodes;
+        for (int idx=0; idx<numNodes; ++idx){
+            if (Node.isUsed(nodePool[idx])) {
+                ++stats.numUsed;
+                if (Node.isLeaf(nodePool[idx]))
+                    ++stats.numLeaves;
+                else
+                    ++stats.numNodes;
+            }
         }
 
         stats.depth = this.depth;
@@ -592,26 +606,35 @@ public class VoxTree {
 
         int nodeCnt = 0;
         int leafCnt = 0;
-        for (int idx=0; idx<firstFreeNode; ++idx){
-            if (Node.isLeaf(nodeArray[idx]))
+        for (int idx=0; idx< firstFreeNodeIndex; ++idx){
+            if (Node.isLeaf(nodePool[idx]))
                 ++leafCnt;
             else
                 ++nodeCnt;
         }
         result.append(this.getClass()).append(" Object {").append(NEW_LINE);
-        result.append("   Free Node: ").append(firstFreeNode).append(" of ").append(this.numNodes).append(NEW_LINE);
+        result.append("   Free Node: ").append(firstFreeNodeIndex).append(" of ").append(this.numNodes).append(NEW_LINE);
         result.append("   (").append(nodeCnt).append(" nodes, ").append(leafCnt).append(" leaves)").append(NEW_LINE);
         result.append("   Tree Depth: ").append(this.depth).append(NEW_LINE);
         result.append("   Edge Length: ").append(edgeLength).append(NEW_LINE);
         result.append("   Corner 0: ").append(nearTopLeft).append(NEW_LINE);
         result.append("   Corner 1: ").append(farBottomRight).append(NEW_LINE);
-        for (int idx=0; idx<Math.min(65, firstFreeNode); ++idx){
-            result.append(idx);
-            result.append(": ");
-            result.append(Node.toString(nodeArray[idx]));
-            result.append(NEW_LINE);
+        boolean elided = false;
+        for (int idx=0; idx<64; ++idx){
+            if (Node.isUsed(nodePool[idx])) {
+                result.append(idx);
+                result.append(": ");
+                result.append(Node.toString(nodePool[idx]));
+                result.append(NEW_LINE);
+                elided = false;
+            } else {
+                if (!elided) {
+                    result.append("...").append(NEW_LINE);
+                    elided = true;
+                }
+            }
         }
-        if (firstFreeNode > 65) result.append("...").append(NEW_LINE);
+        result.append("...").append(NEW_LINE);
         result.append("}");
 
         return result.toString();

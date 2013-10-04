@@ -232,7 +232,7 @@ viewPoint.set(30, 210, -206);
         if (e.getButton() == MouseEvent.BUTTON3){
             tree.setVoxelPath(path, 0);
         } else if (e.getButton() == MouseEvent.BUTTON1){
-            Point3i center = tree.getVoxelPoint(tree.pickNodePath);
+            Point3i center = Path.toPosition(tree.pickNodePath, tree.edgeLength());
             switch (tree.pickFacet) {
                 case VoxTree.XY_PLANE:
                     center.add(new Point3i(0, 0, -(int)Math.copySign(tree.stride(), tree.pickRay.z)));

@@ -9,11 +9,26 @@
     <version>1.0-SNAPSHOT</version>
 
     <dependencies>
+        <!-- TestNG -->
         <dependency>
             <groupId>org.testng</groupId>
             <artifactId>testng</artifactId>
             <version>6.1.1</version>
             <scope>test</scope>
         </dependency>
+        <!-- VecMath -->
+        <dependency>
+            <groupId>java3d</groupId>
+            <artifactId>vecmath</artifactId>
+            <version>1.3.1</version>
+        </dependency>
+        <!-- Cassandra DB -->
+        <!--
+        <dependency>
+            <groupId>com.datastax.cassandra</groupId>
+            <artifactId>cassandra-driver-core</artifactId>
+            <version>1.0.3</version>
+        </dependency>
+        -->
     </dependencies>
 </project>

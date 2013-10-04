@@ -25,6 +25,7 @@ class Node {
      *    +------+------+------+------+------+------+------+------+
      *                24            16             8             0
      */
+    // TODO: Remove the "NODE_" from these.  It's redundant.
     private static final long NODE_RGBA_MASK        = 0x00000000FFFFFFFFL;
     private static final long NODE_BLUE_MASK        = 0x00000000000000FFL;
     private static final long NODE_GREEN_MASK       = 0x000000000000FF00L;
@@ -32,6 +33,7 @@ class Node {
     private static final long NODE_ALPHA_MASK       = 0x00000000FF000000L;
     private static final long NODE_CHILD_MASK       = 0x00FFFFFF00000000L;
     private static final long NODE_FLAG_LEAF_MASK   = 0x0100000000000000L;
+    private static final long NODE_FLAG_USED_MASK   = 0x0200000000000000L;
     private static final long NODE_DEPTH_MASK       = 0xF000000000000000L;
 
     private static final byte NODE_RGBA_SHIFT       = 0;
@@ -41,6 +43,8 @@ class Node {
     private static final byte NODE_ALPHA_SHIFT      = 24;
     private static final byte NODE_CHILD_SHIFT      = 32;
     private static final byte NODE_DEPTH_SHIFT      = 60;
+
+    public static final int END_OF_FREE_NODES = 0;
 
     static long setColor(long node, int red, int green, int blue, int alpha){
         long rgba = Color.setColor(red, green, blue, alpha);
@@ -89,6 +93,17 @@ class Node {
 
     static boolean isLeaf(long node){
         return (node & NODE_FLAG_LEAF_MASK) == NODE_FLAG_LEAF_MASK;
+    }
+
+    static long setUsed(long node, boolean used){
+        if (used){
+            return (node | NODE_FLAG_USED_MASK);
+        }
+        return (node & ~NODE_FLAG_USED_MASK);
+    }
+
+    static boolean isUsed(long node){
+        return (node & NODE_FLAG_USED_MASK) == NODE_FLAG_USED_MASK;
     }
 
     static long setDepth(long node, byte depth){
