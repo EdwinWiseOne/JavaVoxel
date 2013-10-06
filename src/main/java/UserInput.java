@@ -1,17 +1,23 @@
 
+import com.simreal.VoxEngine.Color;
+import com.simreal.VoxEngine.Path;
+import com.simreal.VoxEngine.VoxTree;
+
+import javax.swing.JColorChooser;
+import javax.swing.JFrame;
 import javax.vecmath.Point3d;
 import javax.vecmath.Point3i;
 import javax.vecmath.Vector3d;
-
-import java.awt.*;
+import java.awt.AWTException;
+import java.awt.Canvas;
+import java.awt.Point;
+import java.awt.Robot;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 
-import com.simreal.VoxEngine.*;
-import com.simreal.VoxEngine.Color;
 
 public class UserInput implements Runnable, KeyListener, MouseListener, MouseMotionListener {
 
@@ -32,6 +38,9 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
     private Vector3d upVec;
 
     private int movement;
+
+
+    private java.awt.Color selectedColor = java.awt.Color.CYAN;
 
     static final int MOVE_FORWARDS      = 0x0001;
     static final int MOVE_BACKWARDS     = 0x0002;
@@ -98,12 +107,20 @@ viewPoint.set(30, 210, -206);
                 if ((movement & MOVE_FAST) != 0)        speed *= 10.0;
                 if ((movement & MOVE_SLOW) != 0)        speed *= 0.25;
 
+                Point3d prevPoint = new Point3d(viewPoint);
+
                 if ((movement & MOVE_FORWARDS) != 0)    viewPoint.scaleAdd(speed, fwVec, viewPoint);
                 if ((movement & MOVE_BACKWARDS) != 0)   viewPoint.scaleAdd(-speed, fwVec, viewPoint);
                 if ((movement & MOVE_LEFT) != 0)        viewPoint.scaleAdd(speed, ltVec, viewPoint);
                 if ((movement & MOVE_RIGHT) != 0)       viewPoint.scaleAdd(-speed, ltVec, viewPoint);
                 if ((movement & MOVE_UP) != 0)          viewPoint.scaleAdd(speed, upVec, viewPoint);
                 if ((movement & MOVE_DOWN) != 0)        viewPoint.scaleAdd(-speed, upVec, viewPoint);
+
+                Point3i voxPoint = new Point3i((int)viewPoint.x, (int)viewPoint.y, (int)viewPoint.z);
+                if (tree.testVoxelPoint(voxPoint) != 0L) {
+                    viewPoint.set(prevPoint);
+                    // TODO: Refine the voxPoint that was undoubtedly split
+                }
 
             } catch (InterruptedException e) {
                 e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
@@ -209,6 +226,21 @@ viewPoint.set(30, 210, -206);
     }
 
     public void keyTyped(KeyEvent e){
+        switch (e.getKeyChar()) {
+            case 'i':
+                JFrame guiFrame = new JFrame();
+                selectedColor = JColorChooser.showDialog(guiFrame, "Pick a Color", selectedColor);
+                long color = Color.setColor(selectedColor);
+                System.out.println(Color.toString(color) +
+                        " @ 1%: " + Color.toString(Color.illuminate(color, 0.01)) +
+                        " 50% : " + Color.toString(Color.illuminate(color, 0.5)) +
+                        " 100% : " + Color.toString(Color.illuminate(color, 1.0))
+                );
+                break;
+            case '?':
+                int test = 1;
+                break;
+        }
     }
 
     public void mouseEntered(MouseEvent e){
@@ -244,7 +276,7 @@ viewPoint.set(30, 210, -206);
                     center.add(new Point3i(0, -(int)Math.copySign(tree.stride(), tree.pickRay.y), 0));
                     break;
             }
-            tree.setVoxelPoint(center, (int)Color.setColor(0, 255, 128, 255));
+            tree.setVoxelPoint(center, (int)Color.setColor(selectedColor));
         }
     }
 

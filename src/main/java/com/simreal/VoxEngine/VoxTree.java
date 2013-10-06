@@ -25,15 +25,6 @@ public class VoxTree {
             octant = 0;
         }
 
-        // TODO: Need to track depth in tree of ray, and path of parents to picked node to recombine the tree on set
-        /*public void set(Point3d t0, Point3d t1, Point3d tM, int nodeIndex, int octant) {
-            this.t0.set(t0);
-            this.t1.set(t1);
-            this.tM.set(tM);
-            this.nodeIndex = nodeIndex;
-            this.octant = octant;
-        }*/
-
         public void set(State state){
             this.t0.set(state.t0);
             this.t1.set(state.t1);
@@ -48,12 +39,17 @@ public class VoxTree {
     private static final int NO_FREE_NODE_INDEX = -1;
 
     int depth;
-    int numNodes;
+    int nodeDepth;
     int edgeLength;
 
-    // TODO: Encapsulate node pool to help enforce memory management
+    // TODO: Encapsulate node and brick pools to help enforce memory management
+    int numNodes;
     long[] nodePool;
     int firstFreeNodeIndex;
+
+    int numBricks;
+    long[] brickPool;
+    int firstFreeBrickIndex;
 
     private Point3d nearTopLeft;
     private Point3d farBottomRight;
@@ -70,6 +66,7 @@ public class VoxTree {
     private State newState;
 
     private Random rand;
+    private Texture texture;
 
     public long pickNodePath;
     public int pickNodeIndex;
@@ -84,14 +81,17 @@ public class VoxTree {
     public static final int XZ_PLANE = 2;
     public static final int YZ_PLANE = 4;
 
-    static final int BRICK_EDGE = 16;
+    static final int BRICK_DEPTH = 4;
+    static final int BRICK_LENGTH = (1 << BRICK_DEPTH);
     /**
      *
      */
     public VoxTree(int depth){
         this.depth = depth;
-        this.edgeLength = (1 << depth) * BRICK_EDGE;
+        this.nodeDepth = depth - BRICK_DEPTH;
+        this.edgeLength = (1 << depth) * BRICK_LENGTH;
         this.numNodes = 1024 * 1024;
+        this.numBricks = 1024 * 1024;
 
         // --------------------------------------
         // Initialize the node pool
@@ -102,8 +102,20 @@ public class VoxTree {
             nodePool[idx] = Node.setChild(0L, idx+1);
         }
         nodePool[numNodes-1] = Node.END_OF_FREE_NODES;
-        int nodeIndex = getFreeNodeIndex();
-        nodePool[nodeIndex] = Node.setLeaf(nodePool[nodeIndex], true);
+        int index = getFreeNodeIndex();
+        nodePool[index] = Node.setLeaf(nodePool[index], true);
+
+        // --------------------------------------
+        // Initialize the brick pool
+        // --------------------------------------
+        brickPool = new long[numBricks];
+        // Chain together all of the free nodes
+        for (int idx=0; idx<(numBricks-1); ++idx) {
+            brickPool[idx] = Node.setChild(0L, idx+1);
+        }
+        brickPool[numBricks-1] = Node.END_OF_FREE_NODES;
+        index = getFreeNodeIndex();
+        brickPool[index] = Node.setLeaf(brickPool[index], true);
 
         // --------------------------------------
         // Define the world cube
@@ -116,7 +128,9 @@ public class VoxTree {
         // Raycast traversal data
         // --------------------------------------
         stateStack = new State[depth+1];
-        for (int idx=0; idx<= depth; ++idx) stateStack[idx] = new State();
+        for (int idx=0; idx<= depth; ++idx) {
+            stateStack[idx] = new State();
+        }
 
         state = new State();
         newState = new State();
@@ -141,7 +155,13 @@ public class VoxTree {
         // Misc
         // --------------------------------------
         rand = new Random();
-
+        texture = new Texture();
+        texture.scale = 50;
+        texture.decay = 0.1;
+        texture.seaLevel = 192;
+        texture.threshold = 64;
+        texture.quantLevel = 6;
+        texture.transform =  Texture.QUANT;
     }
 
     public int edgeLength(){
@@ -149,7 +169,7 @@ public class VoxTree {
     }
 
     public int stride(){
-        return BRICK_EDGE;
+        return BRICK_LENGTH;
     }
 
     public int getFreeNodeIndex() {
@@ -172,6 +192,45 @@ public class VoxTree {
         firstFreeNodeIndex = nodeIndex;
     }
 
+    public int getFreeBrickIndex() {
+        int freeNodeIndex = firstFreeBrickIndex;
+        firstFreeBrickIndex = Node.child(brickPool[freeNodeIndex]);
+        if (firstFreeBrickIndex == Node.END_OF_FREE_NODES) {
+            firstFreeBrickIndex = NO_FREE_NODE_INDEX;
+        }
+        brickPool[freeNodeIndex] = Node.setUsed(brickPool[freeNodeIndex], true);
+        return freeNodeIndex;
+    }
+
+    public void putFreeBrickIndex(int nodeIndex) {
+        int nextFree = firstFreeBrickIndex;
+        if (nextFree == NO_FREE_NODE_INDEX) {
+            nextFree = Node.END_OF_FREE_NODES;
+        }
+
+        brickPool[nodeIndex] = Node.setUsed(Node.setChild(0L, nextFree), false);
+        firstFreeBrickIndex = nodeIndex;
+    }
+
+
+    public long testVoxelPoint(Point3i voxel) {
+        if ( (voxel.x < nearTopLeft.x)
+                || (voxel.y < nearTopLeft.y)
+                || (voxel.z < nearTopLeft.z)
+                || (voxel.x > farBottomRight.x)
+                || (voxel.y > farBottomRight.y)
+                || (voxel.z > farBottomRight.z) ){
+            return 0L;
+        }
+        long path = Path.fromPosition(voxel, this.edgeLength, depth);
+        return testVoxelPath(path);
+    }
+
+    public long testVoxelPath(long path) {
+        int nodeIndex = getIndexForPath(path);
+        // System.out.println("Set " + Path.toString(path) + " (" + nodeIndex + ") to " + Color.toString(color));
+        return Node.color(nodePool[nodeIndex]);
+    }
 
     public void setVoxelPoint(Point3i voxel, int color){
         if ( (voxel.x < nearTopLeft.x)
@@ -337,12 +396,14 @@ public class VoxTree {
             color = castSubtree(t0, t1, pick);
             if (pick || (Color.alpha(color) >= 250)) return color;
         }
+        color = Color.blend(color, Color.setColor(0, 0,0, texture.density(inRay.x, inRay.y, ((double)System.currentTimeMillis() / 20000.0) % 512.0)));
         return Color.blend(color, Color.setColor(rand.nextInt(256), 0, 0, 255));
     }
 
     /**
      *
      */
+    // TODO: LOD tree depth truncation on cast
     private long castSubtree(Point3d t0, Point3d t1, boolean pick){
 
         // Error condition early exit
@@ -380,7 +441,7 @@ public class VoxTree {
                 double tmin = Math.max(state.t0.x, Math.max(state.t0.y, state.t0.z));
 
                 if (tmin <= PICK_DEPTH) {
-                    // If picking, we must traverse to the very bottom...
+                    // If picking, we must traverse to the very bottom of the nodes (but not bricks)...
                     node = splitVoxel(state.nodeIndex);
                     nodePool[state.nodeIndex] = node;
                 }
@@ -412,9 +473,6 @@ public class VoxTree {
                         if ((prevPickNodeIndex != 0) && (pickNodeIndex != prevPickNodeIndex)) {
                             refineVoxelPath(pickNodePath);
                         }
-
-                        // TODO: Refine the parent path of the previously picked node, to possibly reverse
-                        // any splitting we did to pick...
 
                         return 0;
                     }
