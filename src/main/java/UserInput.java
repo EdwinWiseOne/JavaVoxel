@@ -237,6 +237,9 @@ viewPoint.set(30, 210, -206);
                         " 100% : " + Color.toString(Color.illuminate(color, 1.0))
                 );
                 break;
+            case 's':
+                tree.save("Test");
+                break;
             case '?':
                 int test = 1;
                 break;
