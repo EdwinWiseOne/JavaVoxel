@@ -2,8 +2,8 @@ package com.simreal.VoxEngine;
 
 
 import com.simreal.VoxEngine.annotations.Stateless;
-
 import javax.vecmath.Point3i;
+
 import java.util.Formatter;
 
 @Stateless

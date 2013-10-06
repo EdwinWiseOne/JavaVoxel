@@ -55,6 +55,10 @@ public class Color {
                 | ((long)(alpha & COLOR_BYTE_MASK) << COLOR_ALPHA_SHIFT);
     }
 
+    public static long setColor(java.awt.Color color) {
+        return setColor(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha());
+    }
+
     public static long illuminate(long color, double illum){
         int red = Color.red(color);
         int green = Color.green(color);
@@ -84,7 +88,7 @@ public class Color {
                 | (alpha << COLOR_ALPHA_SHIFT);
     }
 
-    static String toString(long color){
+    static public String toString(long color){
         StringBuilder result = new StringBuilder();
         Formatter fmt = new Formatter();
         String NEW_LINE = System.getProperty("line.separator");
