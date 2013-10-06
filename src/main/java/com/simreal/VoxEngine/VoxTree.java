@@ -1,9 +1,14 @@
 package com.simreal.VoxEngine;
 
+import org.codehaus.jackson.JsonFactory;
+import org.codehaus.jackson.JsonGenerator;
+
 import javax.vecmath.Point3d;
 import javax.vecmath.Point3i;
 import javax.vecmath.Vector3d;
+import java.io.StringWriter;
 import java.util.Random;
+
 
 // QSC powered speakers
 
@@ -45,15 +50,13 @@ public class VoxTree {
     }
 
     private static final int PICK_DEPTH = 256;
-    private static final int NO_FREE_NODE_INDEX = -1;
 
     int depth;
-    int numNodes;
     int edgeLength;
+    int nodePoolSize;
 
     // TODO: Encapsulate node pool to help enforce memory management
-    long[] nodePool;
-    int firstFreeNodeIndex;
+    NodePool nodePool;
 
     private Point3d nearTopLeft;
     private Point3d farBottomRight;
@@ -91,19 +94,15 @@ public class VoxTree {
     public VoxTree(int depth){
         this.depth = depth;
         this.edgeLength = (1 << depth) * BRICK_EDGE;
-        this.numNodes = 1024 * 1024;
+        this.nodePoolSize = 1024 * 1024;
 
         // --------------------------------------
         // Initialize the node pool
         // --------------------------------------
-        nodePool = new long[numNodes];
-        // Chain together all of the free nodes
-        for (int idx=0; idx<(numNodes-1); ++idx) {
-            nodePool[idx] = Node.setChild(0L, idx+1);
-        }
-        nodePool[numNodes-1] = Node.END_OF_FREE_NODES;
-        int nodeIndex = getFreeNodeIndex();
-        nodePool[nodeIndex] = Node.setLeaf(nodePool[nodeIndex], true);
+        nodePool = new NodePool(nodePoolSize);
+
+        int nodeIndex = nodePool.getFree();
+        nodePool.set(nodeIndex, Node.setLeaf(nodePool.node(nodeIndex), true));
 
         // --------------------------------------
         // Define the world cube
@@ -152,26 +151,6 @@ public class VoxTree {
         return BRICK_EDGE;
     }
 
-    public int getFreeNodeIndex() {
-        int freeNodeIndex = firstFreeNodeIndex;
-        firstFreeNodeIndex = Node.child(nodePool[freeNodeIndex]);
-        if (firstFreeNodeIndex == Node.END_OF_FREE_NODES) {
-            firstFreeNodeIndex = NO_FREE_NODE_INDEX;
-        }
-        nodePool[freeNodeIndex] = Node.setUsed(nodePool[freeNodeIndex], true);
-        return freeNodeIndex;
-    }
-
-    public void putFreeNodeIndex(int nodeIndex) {
-        int nextFree = firstFreeNodeIndex;
-        if (nextFree == NO_FREE_NODE_INDEX) {
-            nextFree = Node.END_OF_FREE_NODES;
-        }
-
-        nodePool[nodeIndex] = Node.setUsed(Node.setChild(0L, nextFree), false);
-        firstFreeNodeIndex = nodeIndex;
-    }
-
 
     public void setVoxelPoint(Point3i voxel, int color){
         if ( (voxel.x < nearTopLeft.x)
@@ -190,7 +169,7 @@ public class VoxTree {
     public void setVoxelPath(long path, int color) {
         int nodeIndex = getIndexForPath(path);
         System.out.println("Set " + Path.toString(path) + " (" + nodeIndex + ") to " + Color.toString(color));
-        nodePool[nodeIndex] = Node.setColor(nodePool[nodeIndex], color);
+        nodePool.set(nodeIndex, Node.setColor(nodePool.node(nodeIndex), color));
 
         int depth = Path.depth(path);
         //path = Path.setDepth(path, depth-1);
@@ -198,18 +177,18 @@ public class VoxTree {
     }
 
     private long splitVoxel(int nodeIndex) {
-        long node = nodePool[nodeIndex];
+        long node = nodePool.node(nodeIndex);
         long childNode = Node.setDepth(node, (byte)(Node.depth(node)+1));
 
         System.out.println("Split: populating " + nodeIndex);
 
         for (int idx=0; idx<8; ++idx) {
-            int childIndex = getFreeNodeIndex();
+            int childIndex = nodePool.getFree();
             if (idx == 0) {
                 node = Node.setChild(Node.setLeaf(node, false), childIndex);
-                nodePool[nodeIndex] = node;
+                nodePool.set(nodeIndex, node);
             }
-            nodePool[childIndex] = childNode;
+            nodePool.set(childIndex, childNode);
         }
         return node;
     }
@@ -227,14 +206,14 @@ public class VoxTree {
     private boolean refineVoxel(long path, boolean allowMerge) {
         int nodeIndex = getIndexForPath(path);
 
-        long parentNode = nodePool[nodeIndex];
+        long parentNode = nodePool.node(nodeIndex);
         int childIndex = Node.child(parentNode);
 
         // If all children are the same color, coalesce into this parent
-        long color = Node.color(nodePool[childIndex]);
+        long color = Node.color(nodePool.node(childIndex));
         boolean merge = true;
         for (int idx=1; idx<8; ++idx){
-            long node = nodePool[childIndex+idx];
+            long node = nodePool.node(childIndex+idx);
             if (color != Node.color(node)) {
                 merge = false;
                 break;
@@ -244,9 +223,9 @@ public class VoxTree {
         if (merge && allowMerge) {
             System.out.println("Refine: trimming " + nodeIndex);
 
-            nodePool[nodeIndex] = Node.setLeaf(Node.setColor(parentNode, color), true);
+            nodePool.set(nodeIndex, Node.setLeaf(Node.setColor(parentNode, color), true));
             for (int idx=7; idx>=0; --idx) {
-                putFreeNodeIndex(childIndex + idx);
+                nodePool.putFree(childIndex + idx);
             }
             return true;
         }
@@ -257,14 +236,13 @@ public class VoxTree {
         long blue = 0;
         long alpha = 0;
         for (int idx=0; idx<8; ++idx){
-            long node = nodePool[childIndex+idx];
+            long node = nodePool.node(childIndex+idx);
             red += Node.red(node);
             green += Node.green(node);
             blue += Node.blue(node);
             alpha += Node.alpha(node);
         }
-        nodePool[nodeIndex] = Node.setColor(parentNode, (int) (red >>> 3), (int) (green >>> 3), (int) (blue >>> 3), (int) (alpha >>> 3));
-
+        nodePool.set(nodeIndex,  Node.setColor(parentNode, (int) (red >>> 3), (int) (green >>> 3), (int) (blue >>> 3), (int) (alpha >>> 3)));
         return false;
     }
 
@@ -274,7 +252,7 @@ public class VoxTree {
         long node;
         long childNode;
         for (int cnt=0; cnt<depth; ++cnt) {
-            node = nodePool[nodeIndex];
+            node = nodePool.node(nodeIndex);
 
             // Subdivide if we hit a leaf before the bottom
             if (Node.isLeaf(node)){
@@ -372,7 +350,7 @@ public class VoxTree {
             state.set(stateStack[--stateStackTop]);
 
             // Child...
-            long node = nodePool[state.nodeIndex];
+            long node = nodePool.node(state.nodeIndex);
             if ( Node.isLeaf(node)
                     && pick
                     && (Node.depth(node) < depth)) {
@@ -382,7 +360,7 @@ public class VoxTree {
                 if (tmin <= PICK_DEPTH) {
                     // If picking, we must traverse to the very bottom...
                     node = splitVoxel(state.nodeIndex);
-                    nodePool[state.nodeIndex] = node;
+                    nodePool.set(state.nodeIndex, node);
                 }
 
             }
@@ -571,100 +549,67 @@ public class VoxTree {
     // --------------------------------------
     // Save, Load, and related utilities
     // --------------------------------------
-    public void save(String filePath) {
+    public void save(String name) {
+        NodePool savePool = compressTree();
 
-    }
+        // TODO: Shift over to database storage
 
-    private long[] compressTree(void) {
-        // Determine our size
-        VoxTreeStatistics stats = analyze();
+        JsonFactory jsonFactory = new JsonFactory(); // or, for data binding, org.codehaus.jackson.mapper.MappingJsonFactory
+        StringWriter output = new StringWriter();
 
-        // Allocate a just-right buffer
+        try {
+            JsonGenerator jg = jsonFactory.createJsonGenerator(output); // or Stream, Reader
 
-        nodePool = new long[numNodes];
-        // Chain together all of the free nodes
-        for (int idx=0; idx<(numNodes-1); ++idx) {
-            nodePool[idx] = Node.setChild(0L, idx+1);
+            jg.writeArrayFieldStart(name);
+            jg.writeObject(savePool);
+            jg.writeEndArray();
+
+        } catch (Exception e) {
         }
-        nodePool[numNodes-1] = Node.END_OF_FREE_NODES;
-        int nodeIndex = getFreeNodeIndex();
-        nodePool[nodeIndex] = Node.setLeaf(nodePool[nodeIndex], true);
 
+        String outputString = output.toString();
+        System.out.println(outputString);
     }
 
-    // --------------------------------------
-    // Analysis and debugging
-    // --------------------------------------
+    private void copyNodeSubtree(NodePool srcPool, int srcIndex, NodePool dstPool) {
+        long srcNode = srcPool.node(srcIndex);
+        dstPool.set(dstPool.getFree(), srcNode);
 
-    class VoxTreeStatistics {
-        public int depth;
-        public int numUsed;
-        public int numNodes;
-        public int numLeaves;
-
-        VoxTreeStatistics() {
-            depth = 0;
-            numUsed = 0;
-            numNodes = 0;
-            numLeaves = 0;
-        }
-    }
-
-    VoxTreeStatistics analyze() {
-        VoxTreeStatistics stats = new VoxTreeStatistics();
-
-        for (int idx=0; idx<numNodes; ++idx){
-            if (Node.isUsed(nodePool[idx])) {
-                ++stats.numUsed;
-                if (Node.isLeaf(nodePool[idx]))
-                    ++stats.numLeaves;
-                else
-                    ++stats.numNodes;
+        if (!Node.isLeaf(srcNode)) {
+            int tile = Node.child(srcNode);
+            for (int child=0; child<8; ++child) {
+                copyNodeSubtree(srcPool, tile+child, dstPool);
             }
         }
-
-        stats.depth = this.depth;
-
-        return stats;
     }
 
-    public String toString(){
+    private NodePool compressTree() {
+        // Determine our size
+        NodePool.Statistics stats = nodePool.analyze();
+
+        // Allocate a just-right pool
+        NodePool newPool = new NodePool(stats.numNodes);
+
+        int nodeIndex = 0;  // Start at the root
+
+        copyNodeSubtree(nodePool, nodeIndex, newPool);
+
+        return newPool;
+    }
+
+    public String toString() {
         StringBuilder result = new StringBuilder();
         String NEW_LINE = System.getProperty("line.separator");
 
-        int nodeCnt = 0;
-        int leafCnt = 0;
-        for (int idx=0; idx< firstFreeNodeIndex; ++idx){
-            if (Node.isLeaf(nodePool[idx]))
-                ++leafCnt;
-            else
-                ++nodeCnt;
-        }
-        result.append(this.getClass()).append(" Object {").append(NEW_LINE);
-        result.append("   Free Node: ").append(firstFreeNodeIndex).append(" of ").append(this.numNodes).append(NEW_LINE);
-        result.append("   (").append(nodeCnt).append(" nodes, ").append(leafCnt).append(" leaves)").append(NEW_LINE);
+        result.append(this.getClass()).append(" NodePool {").append(NEW_LINE);
         result.append("   Tree Depth: ").append(this.depth).append(NEW_LINE);
         result.append("   Edge Length: ").append(edgeLength).append(NEW_LINE);
         result.append("   Corner 0: ").append(nearTopLeft).append(NEW_LINE);
         result.append("   Corner 1: ").append(farBottomRight).append(NEW_LINE);
-        boolean elided = false;
-        for (int idx=0; idx<64; ++idx){
-            if (Node.isUsed(nodePool[idx])) {
-                result.append(idx);
-                result.append(": ");
-                result.append(Node.toString(nodePool[idx]));
-                result.append(NEW_LINE);
-                elided = false;
-            } else {
-                if (!elided) {
-                    result.append("...").append(NEW_LINE);
-                    elided = true;
-                }
-            }
-        }
-        result.append("...").append(NEW_LINE);
+        result.append(nodePool.toString());
         result.append("}");
 
         return result.toString();
     }
+
 }
