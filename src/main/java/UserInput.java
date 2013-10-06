@@ -107,12 +107,20 @@ viewPoint.set(30, 210, -206);
                 if ((movement & MOVE_FAST) != 0)        speed *= 10.0;
                 if ((movement & MOVE_SLOW) != 0)        speed *= 0.25;
 
+                Point3d prevPoint = new Point3d(viewPoint);
+
                 if ((movement & MOVE_FORWARDS) != 0)    viewPoint.scaleAdd(speed, fwVec, viewPoint);
                 if ((movement & MOVE_BACKWARDS) != 0)   viewPoint.scaleAdd(-speed, fwVec, viewPoint);
                 if ((movement & MOVE_LEFT) != 0)        viewPoint.scaleAdd(speed, ltVec, viewPoint);
                 if ((movement & MOVE_RIGHT) != 0)       viewPoint.scaleAdd(-speed, ltVec, viewPoint);
                 if ((movement & MOVE_UP) != 0)          viewPoint.scaleAdd(speed, upVec, viewPoint);
                 if ((movement & MOVE_DOWN) != 0)        viewPoint.scaleAdd(-speed, upVec, viewPoint);
+
+                Point3i voxPoint = new Point3i((int)viewPoint.x, (int)viewPoint.y, (int)viewPoint.z);
+                if (tree.testVoxelPoint(voxPoint) != 0L) {
+                    viewPoint.set(prevPoint);
+                    // TODO: Refine the voxPoint that was undoubtedly split
+                }
 
             } catch (InterruptedException e) {
                 e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.

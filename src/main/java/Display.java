@@ -11,9 +11,9 @@ import java.awt.Graphics;
 import java.awt.image.BufferStrategy;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
-import java.util.Random;
 
-
+// TODO: Clone Display, add Load and Save, and make it into a Brick Editor
+// TODO: Load bricks from a brick file, and render them at the end of the path (separate pathing for bricks)
 public class Display extends Canvas implements Runnable {
     /**
      *
@@ -43,7 +43,6 @@ public class Display extends Canvas implements Runnable {
     private int activeNode;
 
     public Display(){
-        Random rand = new Random();
         img = new BufferedImage(WIDTH, HEIGHT, imageType);
 
         activeNode = 0;
