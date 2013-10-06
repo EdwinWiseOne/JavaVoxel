@@ -568,6 +568,34 @@ public class VoxTree {
         return octant.z;  // exit XY Plane
     }
 
+    // --------------------------------------
+    // Save, Load, and related utilities
+    // --------------------------------------
+    public void save(String filePath) {
+
+    }
+
+    private long[] compressTree(void) {
+        // Determine our size
+        VoxTreeStatistics stats = analyze();
+
+        // Allocate a just-right buffer
+
+        nodePool = new long[numNodes];
+        // Chain together all of the free nodes
+        for (int idx=0; idx<(numNodes-1); ++idx) {
+            nodePool[idx] = Node.setChild(0L, idx+1);
+        }
+        nodePool[numNodes-1] = Node.END_OF_FREE_NODES;
+        int nodeIndex = getFreeNodeIndex();
+        nodePool[nodeIndex] = Node.setLeaf(nodePool[nodeIndex], true);
+
+    }
+
+    // --------------------------------------
+    // Analysis and debugging
+    // --------------------------------------
+
     class VoxTreeStatistics {
         public int depth;
         public int numUsed;
