@@ -575,7 +575,8 @@ public class VoxTree {
 
     }
 
-    private long[] compressTree(void) {
+/*
+    private long[] compressTree() {
         // Determine our size
         VoxTreeStatistics stats = analyze();
 
@@ -591,6 +592,7 @@ public class VoxTree {
         nodePool[nodeIndex] = Node.setLeaf(nodePool[nodeIndex], true);
 
     }
+*/
 
     // --------------------------------------
     // Analysis and debugging
