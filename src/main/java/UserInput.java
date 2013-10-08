@@ -116,11 +116,13 @@ viewPoint.set(30, 210, -206);
                 if ((movement & MOVE_UP) != 0)          viewPoint.scaleAdd(speed, upVec, viewPoint);
                 if ((movement & MOVE_DOWN) != 0)        viewPoint.scaleAdd(-speed, upVec, viewPoint);
 
+/*
                 Point3i voxPoint = new Point3i((int)viewPoint.x, (int)viewPoint.y, (int)viewPoint.z);
                 if (tree.testVoxelPoint(voxPoint) != 0L) {
                     viewPoint.set(prevPoint);
                     // TODO: Refine the voxPoint that was undoubtedly split
                 }
+*/
 
             } catch (InterruptedException e) {
                 e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
@@ -236,6 +238,9 @@ viewPoint.set(30, 210, -206);
                         " 50% : " + Color.toString(Color.illuminate(color, 0.5)) +
                         " 100% : " + Color.toString(Color.illuminate(color, 1.0))
                 );
+                break;
+            case 's':
+                tree.save("Test");
                 break;
             case '?':
                 int test = 1;
