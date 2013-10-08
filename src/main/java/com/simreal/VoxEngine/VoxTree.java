@@ -74,6 +74,7 @@ public class VoxTree {
     private State newState;
 
     private Random rand;
+    private Texture texture;
 
     public long pickNodePath;
     public int pickNodeIndex;
@@ -142,6 +143,13 @@ public class VoxTree {
         // --------------------------------------
         rand = new Random();
 
+        texture = new Texture();
+        texture.scale = 50;
+        texture.decay = 0.1;
+        texture.seaLevel = 192;
+        texture.threshold = 64;
+        texture.quantLevel = 6;
+        texture.transform =  Texture.QUANT;
     }
 
     public int edgeLength(){
@@ -150,6 +158,25 @@ public class VoxTree {
 
     public int stride(){
         return BRICK_EDGE;
+    }
+
+    public long testVoxelPoint(Point3i voxel) {
+        if ( (voxel.x < nearTopLeft.x)
+                || (voxel.y < nearTopLeft.y)
+                || (voxel.z < nearTopLeft.z)
+                || (voxel.x > farBottomRight.x)
+                || (voxel.y > farBottomRight.y)
+                || (voxel.z > farBottomRight.z) ){
+            return 0L;
+        }
+        long path = Path.fromPosition(voxel, this.edgeLength, depth);
+        return testVoxelPath(path);
+    }
+
+    public long testVoxelPath(long path) {
+        int nodeIndex = getIndexForPath(path);
+        // System.out.println("Set " + Path.toString(path) + " (" + nodeIndex + ") to " + Color.toString(color));
+        return Node.color(nodePool.node(nodeIndex));
     }
 
 
@@ -316,6 +343,8 @@ public class VoxTree {
             color = castSubtree(t0, t1, pick);
             if (pick || (Color.alpha(color) >= 250)) return color;
         }
+
+        color = Color.blend(color, Color.setColor(0, 0,0, texture.density(inRay.x, inRay.y, ((double)System.currentTimeMillis() / 20000.0) % 512.0)));
         return Color.blend(color, Color.setColor(rand.nextInt(256), 0, 0, 255));
     }
 
