@@ -1,14 +1,15 @@
 package com.simreal.VoxEngine;
 
-import org.codehaus.jackson.JsonFactory;
-import org.codehaus.jackson.JsonGenerator;
+import com.fasterxml.jackson.core.JsonEncoding;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
 
 import javax.vecmath.Point3d;
 import javax.vecmath.Point3i;
 import javax.vecmath.Vector3d;
-import java.io.StringWriter;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.Random;
-
 
 // QSC powered speakers
 
@@ -554,21 +555,34 @@ public class VoxTree {
 
         // TODO: Shift over to database storage
 
-        JsonFactory jsonFactory = new JsonFactory(); // or, for data binding, org.codehaus.jackson.mapper.MappingJsonFactory
-        StringWriter output = new StringWriter();
-
+        JsonFactory jsonFactory = new JsonFactory();
+//        SmileFactory smileFactory = new SmileFactory();
+        // Output: OutputStream is best; Writer second best;
+        // Input: byte[] is best if you have it; InputStream second best; followed by Reader -- and in every case, do NOT try reading input into a String!
+//        StringWriter output = new StringWriter();
         try {
-            JsonGenerator jg = jsonFactory.createJsonGenerator(output); // or Stream, Reader
+            FileOutputStream  output = new FileOutputStream("bricks" + File.separator + name + ".node");
 
-            jg.writeArrayFieldStart(name);
-            jg.writeObject(savePool);
-            jg.writeEndArray();
+//            ObjectMapper mapper = new ObjectMapper(); // can reuse, share globally
+//            mapper.writeValue(output, nodePool);
 
+            JsonGenerator gen = jsonFactory.createJsonGenerator(output, JsonEncoding.UTF8); // or Stream, Reader
+//            SmileGenerator gen = smileFactory.createGenerator(output, JsonEncoding.UTF8);
+
+            gen.writeStartObject();
+            gen.writeNumberField("size", savePool.size());
+            gen.writeArrayFieldStart("pool");
+            // To make more clean, would need to store pool as ByteBuffer (and cast to LongBuffer, etc)
+            for (int index=0; index<savePool.size(); ++index) {
+                gen.writeNumber(savePool.node(index));
+            }
+            gen.writeEndArray();
+            gen.writeEndObject();
+            gen.close();
         } catch (Exception e) {
+            System.out.println(e);
         }
 
-        String outputString = output.toString();
-        System.out.println(outputString);
     }
 
     private void copyNodeSubtree(NodePool srcPool, int srcIndex, NodePool dstPool) {
@@ -588,11 +602,14 @@ public class VoxTree {
         NodePool.Statistics stats = nodePool.analyze();
 
         // Allocate a just-right pool
-        NodePool newPool = new NodePool(stats.numNodes);
+        NodePool newPool = new NodePool(stats.numUsed);
 
         int nodeIndex = 0;  // Start at the root
-
-        copyNodeSubtree(nodePool, nodeIndex, newPool);
+        try {
+            copyNodeSubtree(nodePool, nodeIndex, newPool);
+        } catch (Exception e) {
+            System.out.println(e);
+        }
 
         return newPool;
     }

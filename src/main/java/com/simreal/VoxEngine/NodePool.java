@@ -1,9 +1,9 @@
 package com.simreal.VoxEngine;
 
 public class NodePool {
-    private static int numNodes;
-    private static long[] pool;
-    private static int firstFreeNode;
+    private int numNodes;
+    private long[] pool;
+    private int firstFreeNode;
 
     public static final int NO_FREE_NODE_INDEX = -1;
 
@@ -22,6 +22,10 @@ public class NodePool {
 
     public int size() {
         return numNodes;
+    }
+
+    public long[] pool() {
+        return pool;
     }
 
     public int getFree() {
