@@ -2,6 +2,7 @@
 import com.simreal.VoxEngine.Color;
 import com.simreal.VoxEngine.Path;
 import com.simreal.VoxEngine.VoxTree;
+import com.simreal.VoxEngine.brick.BrickFactory;
 
 import javax.swing.JColorChooser;
 import javax.swing.JFrame;
@@ -242,8 +243,8 @@ viewPoint.set(30, 210, -206);
             case 's':
                 tree.save("Test");
                 break;
-            case '?':
-                int test = 1;
+            case '0':
+                BrickFactory.Black(tree);
                 break;
         }
     }

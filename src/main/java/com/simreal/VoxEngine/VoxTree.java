@@ -144,6 +144,10 @@ public class VoxTree {
 
     }
 
+    public int depth() {
+        return depth;
+    }
+
     public int edgeLength(){
         return edgeLength;
     }
@@ -152,6 +156,13 @@ public class VoxTree {
         return BRICK_EDGE;
     }
 
+    public NodePool nodePool() {
+        return nodePool;
+    }
+
+    public void setPool(NodePool pool) {
+        nodePool = pool;
+    }
 
     public void setVoxelPoint(Point3i voxel, int color){
         if ( (voxel.x < nearTopLeft.x)

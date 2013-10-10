@@ -34,7 +34,7 @@ public class Texture {
     // --------------------------------------
     public int transform = 0x00;    // transformation control flags
     public double scale = 1.0;      // input scaling factor
-    public double decay = 1;           // Curl scaling factor; matches y or z scaling
+    public double decay = 1;        // Curl scaling factor; matches y or z scaling
     public int threshold = 0;       // range 0..255
     public int quantLevel = 0;      // range 1..7
     public int seaLevel = 0xC0;     // range 0..255
