@@ -168,13 +168,28 @@ public class VoxTree {
 
 
     public void setVoxelPath(long path, int color) {
-        int nodeIndex = getIndexForPath(path);
+        int nodeIndex = getIndexForPath(path, true);
         System.out.println("Set " + Path.toString(path) + " (" + nodeIndex + ") to " + Color.toString(color));
         nodePool.set(nodeIndex, Node.setColor(nodePool.node(nodeIndex), color));
 
         int depth = Path.depth(path);
         //path = Path.setDepth(path, depth-1);
         refineVoxelPath(path);
+    }
+
+    public long testVoxelPoint(Point3i pos) {
+        long path = Path.fromPosition(pos, this.edgeLength, depth);
+        if (path == 0L) return 0L;
+
+        return testVoxelPath(path);
+    }
+
+    public long testVoxelPath(long path) {
+        int nodeIndex = getIndexForPath(path, false);
+        if (nodeIndex == 0) return 0L;
+
+        // refineVoxelPath(path);
+        return Node.color(nodePool.node(nodeIndex));
     }
 
     private long splitVoxel(int nodeIndex) {
@@ -205,7 +220,7 @@ public class VoxTree {
     }
 
     private boolean refineVoxel(long path, boolean allowMerge) {
-        int nodeIndex = getIndexForPath(path);
+        int nodeIndex = getIndexForPath(path, true);
 
         long parentNode = nodePool.node(nodeIndex);
         int childIndex = Node.child(parentNode);
@@ -247,7 +262,7 @@ public class VoxTree {
         return false;
     }
 
-    public int getIndexForPath(long path) {
+    public int getIndexForPath(long path, boolean split) {
         int depth = Path.depth(path);
         int nodeIndex = 0;
         long node;
@@ -257,7 +272,11 @@ public class VoxTree {
 
             // Subdivide if we hit a leaf before the bottom
             if (Node.isLeaf(node)){
-                node = splitVoxel(nodeIndex);
+                if (split) {
+                    node = splitVoxel(nodeIndex);
+                } else {
+                    break;
+                }
             }
             nodeIndex = Node.child(node) + Path.child(path, cnt);
         }
@@ -384,7 +403,7 @@ public class VoxTree {
                                 pickNodeIndex = state.nodeIndex;
                                 pickFacet = facet;
 
-                                int index = getIndexForPath(pickNodePath);
+                                int index = getIndexForPath(pickNodePath, true);
                                 //System.out.println("Picked " + pickNodeIndex + " -> " + Path.toString(pickNodePath) + " -> " + index);
                             }
                         }
@@ -417,7 +436,7 @@ public class VoxTree {
 
                     if ((pickNodeIndex > 0) && (pickNodeIndex == state.nodeIndex) && (pickFacet == facet) ){
                         double cycle = (double)System.currentTimeMillis() / 125.0;
-                        illumination = 1.5 + (Math.pow(Math.cos(cycle), 3.0) * .5);
+                        illumination = (1.5 - (Math.pow(Math.cos(cycle), 3.0) * .5));
                     }
                     rgba = Color.blend(rgba, Color.illuminate(newRgba, illumination));
                     if (Color.alpha(rgba) > 250) return rgba;
