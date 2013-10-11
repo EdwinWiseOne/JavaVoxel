@@ -1,5 +1,7 @@
 package com.simreal.VoxEngine;
 
+import com.simreal.VoxEngine.brick.BrickFactory;
+
 import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -53,6 +55,7 @@ public class VoxTree {
     private static final int PICK_DEPTH = 256;
 
     int depth;
+    int breadth;
     int edgeLength;
     int nodePoolSize;
 
@@ -88,13 +91,16 @@ public class VoxTree {
     public static final int XZ_PLANE = 2;
     public static final int YZ_PLANE = 4;
 
+    static final long startTime = System.currentTimeMillis();
+
     static final int BRICK_EDGE = 16;
     /**
      *
      */
     public VoxTree(int depth){
         this.depth = depth;
-        this.edgeLength = (1 << depth) * BRICK_EDGE;
+        this.breadth = 1 << depth;
+        this.edgeLength = breadth * BRICK_EDGE;
         this.nodePoolSize = 1024 * 1024;
 
         // --------------------------------------
@@ -148,6 +154,10 @@ public class VoxTree {
         return depth;
     }
 
+    public int breadth() {
+        return breadth;
+    }
+
     public int edgeLength(){
         return edgeLength;
     }
@@ -180,7 +190,7 @@ public class VoxTree {
 
     public void setVoxelPath(long path, int color) {
         int nodeIndex = getIndexForPath(path, true);
-        System.out.println("Set " + Path.toString(path) + " (" + nodeIndex + ") to " + Color.toString(color));
+//        System.out.println("Set " + Path.toString(path) + " (" + nodeIndex + ") to " + Color.toString(color));
         nodePool.set(nodeIndex, Node.setColor(nodePool.node(nodeIndex), color));
 
         int depth = Path.depth(path);
@@ -207,7 +217,7 @@ public class VoxTree {
         long node = nodePool.node(nodeIndex);
         long childNode = Node.setDepth(node, (byte)(Node.depth(node)+1));
 
-        System.out.println("Split: populating " + nodeIndex);
+//        System.out.println("Split: populating " + nodeIndex);
 
         for (int idx=0; idx<8; ++idx) {
             int childIndex = nodePool.getFree();
@@ -248,7 +258,7 @@ public class VoxTree {
         }
 
         if (merge && allowMerge) {
-            System.out.println("Refine: trimming " + nodeIndex);
+//            System.out.println("Refine: trimming " + nodeIndex);
 
             nodePool.set(nodeIndex, Node.setLeaf(Node.setColor(parentNode, color), true));
             for (int idx=7; idx>=0; --idx) {
@@ -346,6 +356,10 @@ public class VoxTree {
             color = castSubtree(t0, t1, pick);
             if (pick || (Color.alpha(color) >= 250)) return color;
         }
+
+        double screenFactor = 128.0;
+        double tick = (double)(System.currentTimeMillis()-startTime) / 1000.0;
+        color = Color.blend(color, Color.setColor(0, 0, 0, Texture.toByte(BrickFactory.texture().value(inRay.x*screenFactor, inRay.y*screenFactor, tick))));
         return Color.blend(color, Color.setColor(rand.nextInt(256), 0, 0, 255));
     }
 
@@ -512,6 +526,10 @@ public class VoxTree {
                 int octantMirror = thisOctant ^ mirror;
                 newState.nodeIndex = Node.child(node) + octantMirror;
                 newState.nodePath = Path.addChild(state.nodePath, octantMirror);
+                if (stateStackTop > depth) {
+                    System.out.println("STATE STACK OVERFLOW");
+                    return rgba;
+                }
                 stateStack[stateStackTop++].set(newState);
             }
         }

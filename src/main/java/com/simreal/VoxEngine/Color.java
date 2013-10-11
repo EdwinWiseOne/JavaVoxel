@@ -88,10 +88,24 @@ public class Color {
                 | (alpha << COLOR_ALPHA_SHIFT);
     }
 
+    public static long gradient(long c1, long c2, double t)
+    {
+        double u = 1.0 - t;
+
+        long red = (long)((double)Color.red(c1)*u + (double)Color.red(c2)*t);
+        long green = (long)((double)Color.green(c1)*u + (double)Color.green(c2)*t);
+        long blue = (long)((double)Color.blue(c1)*u + (double)Color.blue(c2)*t);
+        long alpha = (long)((double)Color.alpha(c1)*u + (double)Color.alpha(c2)*t);
+
+        return (red << COLOR_RED_SHIFT)
+                | (green << COLOR_GREEN_SHIFT)
+                | (blue << COLOR_BLUE_SHIFT)
+                | (alpha << COLOR_ALPHA_SHIFT);
+    }
+
     static public String toString(long color){
         StringBuilder result = new StringBuilder();
         Formatter fmt = new Formatter();
-        String NEW_LINE = System.getProperty("line.separator");
 
         result.append("RGBA { ");
         fmt.format("%02X, ", Color.red(color));

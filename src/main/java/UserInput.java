@@ -160,6 +160,11 @@ viewPoint.set(30, 210, -206);
 
     public void keyPressed(KeyEvent e){
         //System.out.println("Pressed " + e.getKeyCode() + ", " + e.getKeyChar());
+        if (e.isControlDown()) {
+            BrickFactory.keyPressed(e, tree);
+            return;
+        }
+
         switch (e.getKeyCode()) {
             case KeyEvent.VK_W:
                 movement |= MOVE_FORWARDS;
@@ -197,6 +202,10 @@ viewPoint.set(30, 210, -206);
 
     public void keyReleased(KeyEvent e){
         //System.out.println("Released " + e.getKeyCode());
+        if (e.isControlDown()) {
+            return;
+        }
+
         switch (e.getKeyCode()) {
             case KeyEvent.VK_W:
                 movement &= ~MOVE_FORWARDS;
@@ -226,6 +235,11 @@ viewPoint.set(30, 210, -206);
     }
 
     public void keyTyped(KeyEvent e){
+
+        if (e.isControlDown()) {
+            return;
+        }
+
         switch (e.getKeyChar()) {
             case 'i':
                 JFrame guiFrame = new JFrame();
@@ -238,11 +252,13 @@ viewPoint.set(30, 210, -206);
                 );
                 break;
             case 's':
-                tree.save("Test");
+                tree.save(BrickFactory.name());
                 break;
-            case '0':
-                BrickFactory.Black(tree);
+/*
+            case 'l':
+                tree.load("Test");
                 break;
+*/
         }
     }
 
