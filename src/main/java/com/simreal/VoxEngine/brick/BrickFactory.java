@@ -183,7 +183,7 @@ public class BrickFactory {
             return true;
         }
 
-        return true;
+        return false;
     }
 
     private static void setSkin(VoxTree tree, int x, int y, int z, int w, int color) {
