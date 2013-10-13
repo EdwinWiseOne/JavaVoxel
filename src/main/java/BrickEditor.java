@@ -1,5 +1,4 @@
-
-import com.simreal.VoxEngine.Color;
+import com.simreal.VoxEngine.Material;
 import com.simreal.VoxEngine.VoxTree;
 
 import javax.swing.JFrame;
@@ -12,9 +11,9 @@ import java.awt.image.BufferStrategy;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 
-// TODO: Clone Display, add Load and Save, and make it into a Brick Editor
+// TODO: Clone BrickEditor, add Load and Save, and make it into a Brick Editor
 // TODO: Load bricks from a brick file, and render them at the end of the path (separate pathing for bricks)
-public class Display extends Canvas implements Runnable {
+public class BrickEditor extends Canvas implements Runnable {
     /**
      *
      */
@@ -42,7 +41,7 @@ public class Display extends Canvas implements Runnable {
     private VoxTree tree;
     private int activeNode;
 
-    public Display(){
+    public BrickEditor(){
         img = new BufferedImage(WIDTH, HEIGHT, imageType);
 
         activeNode = 0;
@@ -52,23 +51,16 @@ public class Display extends Canvas implements Runnable {
         int offset = stride >> 1;
 
         // Floor of black
-        for (int x=0; x<tree.edgeLength(); ++x){
-            for (int y=0; y<tree.edgeLength(); ++y){
-                tree.setVoxelPoint(new Point3i((x*stride)+offset, 0, (y*stride)+offset), (int)Color.setColor(30,30,30,255));
+        int value;
+        for (int x=0; x<tree.breadth(); ++x){
+            for (int y=0; y<tree.breadth(); ++y){
+                value = (y * tree.breadth()) + x;
+                tree.setVoxelPoint(new Point3i((x*stride)+offset, 0, (y*stride)+offset), (long) Material.setMaterial(255, 255, 255, 255-value, value, value));
             }
         }
-        //Corner blue voxel fully populated cube
-        tree.setVoxelPoint(new Point3i((0*stride)+offset, (0*stride)+offset, (0*stride)+offset), (int) Color.setColor(0, 0, 192, 255));
-        tree.setVoxelPoint(new Point3i((0*stride)+offset, (0*stride)+offset, (1*stride)+offset), (int) Color.setColor(0, 0, 192, 255));
-        tree.setVoxelPoint(new Point3i((0*stride)+offset, (1*stride)+offset, (0*stride)+offset), (int) Color.setColor(0, 0, 192, 255));
-        tree.setVoxelPoint(new Point3i((0*stride)+offset, (1*stride)+offset, (1*stride)+offset), (int) Color.setColor(0, 0, 192, 255));
-        tree.setVoxelPoint(new Point3i((1*stride)+offset, (0*stride)+offset, (0*stride)+offset), (int) Color.setColor(0, 0, 192, 255));
-        tree.setVoxelPoint(new Point3i((1*stride)+offset, (0*stride)+offset, (1*stride)+offset), (int) Color.setColor(0, 0, 192, 255));
-        tree.setVoxelPoint(new Point3i((1*stride)+offset, (1*stride)+offset, (0*stride)+offset), (int) Color.setColor(0, 0, 192, 255));
-        tree.setVoxelPoint(new Point3i((1*stride)+offset, (1*stride)+offset, (1*stride)+offset), (int) Color.setColor(0, 0, 192, 255));
 
         System.out.println("Spread: " + spread);
-        System.out.println(tree);
+//        System.out.println(tree);
 
     }
 
@@ -98,9 +90,9 @@ public class Display extends Canvas implements Runnable {
             render();
             ++count;
             long newTime = System.currentTimeMillis();
-            if ((newTime - time) > 1000){
-                time += 1000;
-                System.out.println("Frames/Second: " + count);
+            if ((newTime - time) > 10000){
+                time += 10000;
+                System.out.println("Frames/Second: " + count/10);
                 count = 0;
             }
         }
@@ -123,7 +115,7 @@ public class Display extends Canvas implements Runnable {
     }
 
     public static void main(String[] args) {
-        Display rc = new Display();
+        BrickEditor rc = new BrickEditor();
         JFrame frame = new JFrame();
         frame.add(rc);
         frame.pack();

@@ -71,7 +71,7 @@ public class VoxTreeTest {
     @Test(dataProvider = "insertion")
     public void testInsertion(Object[][] details) {
         int test = details.length;
-        long color = (Long)(Color.setColor(255, 0, 0, 255));
+        long color = (Long)(Material.setMaterial(255, 0, 0, 255, 128, 32));
 
         for (int idx=0; idx<details.length; ++idx) {
             Object[] row = details[idx];

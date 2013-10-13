@@ -1,7 +1,8 @@
 
-import com.simreal.VoxEngine.Color;
+import com.simreal.VoxEngine.Material;
 import com.simreal.VoxEngine.Path;
 import com.simreal.VoxEngine.VoxTree;
+import com.simreal.VoxEngine.brick.BrickFactory;
 
 import javax.swing.JColorChooser;
 import javax.swing.JFrame;
@@ -40,7 +41,8 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
     private int movement;
 
 
-    private java.awt.Color selectedColor = java.awt.Color.CYAN;
+    private java.awt.Color selectedColor = java.awt.Color.BLACK;
+    private long selectedMaterial = 0L;
 
     static final int MOVE_FORWARDS      = 0x0001;
     static final int MOVE_BACKWARDS     = 0x0002;
@@ -159,90 +161,102 @@ viewPoint.set(30, 210, -206);
 
     public void keyPressed(KeyEvent e){
         //System.out.println("Pressed " + e.getKeyCode() + ", " + e.getKeyChar());
-        switch (e.getKeyCode()) {
-            case KeyEvent.VK_W:
-                movement |= MOVE_FORWARDS;
-                movement &= ~MOVE_BACKWARDS;
-                break;
-            case KeyEvent.VK_S:
-                movement |= MOVE_BACKWARDS;
-                movement &= ~MOVE_FORWARDS;
-                break;
-            case KeyEvent.VK_A:
-                movement |= MOVE_LEFT;
-                movement &= ~MOVE_RIGHT;
-                break;
-            case KeyEvent.VK_D:
-                movement |= MOVE_RIGHT;
-                movement &= ~MOVE_LEFT;
-                break;
-            case KeyEvent.VK_E:
-                movement |= MOVE_UP;
-                movement &= ~MOVE_DOWN;
-                break;
-            case KeyEvent.VK_C:
-                movement |= MOVE_DOWN;
-                movement &= ~MOVE_UP;
-                break;
-            case KeyEvent.VK_SHIFT:
-                movement |= MOVE_FAST;
-                break;
-            case KeyEvent.VK_CONTROL:
-                movement |= MOVE_SLOW;
-                break;
+        if (e.isControlDown()) {
+            switch (e.getKeyCode()) {
+                case KeyEvent.VK_I:
+                    JFrame guiFrame = new JFrame();
+                    selectedColor = JColorChooser.showDialog(guiFrame, "Pick a Material", selectedColor);
+                    selectedMaterial = Material.setMaterial(selectedColor, 128, 32);
+                    break;
+                default:
+                    BrickFactory.keyPressed(e, tree);
+                    break;
+            }
+        } else if (e.isAltDown()) {
+            switch (e.getKeyCode()) {
+                case KeyEvent.VK_S:
+                    BrickFactory.save();
+                    break;
+/*
+                case KeyEvent.VK_L:
+                    BrickFactory.load();
+                    break;
+*/
+            }
+
+        } else {
+            switch (e.getKeyCode()) {
+                case KeyEvent.VK_W:
+                    movement |= MOVE_FORWARDS;
+                    movement &= ~MOVE_BACKWARDS;
+                    break;
+                case KeyEvent.VK_S:
+                    movement |= MOVE_BACKWARDS;
+                    movement &= ~MOVE_FORWARDS;
+                    break;
+                case KeyEvent.VK_A:
+                    movement |= MOVE_LEFT;
+                    movement &= ~MOVE_RIGHT;
+                    break;
+                case KeyEvent.VK_D:
+                    movement |= MOVE_RIGHT;
+                    movement &= ~MOVE_LEFT;
+                    break;
+                case KeyEvent.VK_E:
+                    movement |= MOVE_UP;
+                    movement &= ~MOVE_DOWN;
+                    break;
+                case KeyEvent.VK_C:
+                    movement |= MOVE_DOWN;
+                    movement &= ~MOVE_UP;
+                    break;
+                case KeyEvent.VK_SHIFT:
+                    movement |= MOVE_FAST;
+                    break;
+                case KeyEvent.VK_CONTROL:
+                    movement |= MOVE_SLOW;
+                    break;
+            }
         }
     }
 
 
     public void keyReleased(KeyEvent e){
         //System.out.println("Released " + e.getKeyCode());
-        switch (e.getKeyCode()) {
-            case KeyEvent.VK_W:
-                movement &= ~MOVE_FORWARDS;
-                break;
-            case KeyEvent.VK_S:
-                movement &= ~MOVE_BACKWARDS;
-                break;
-            case KeyEvent.VK_A:
-                movement &= ~MOVE_LEFT;
-                break;
-            case KeyEvent.VK_D:
-                movement &= ~MOVE_RIGHT;
-                break;
-            case KeyEvent.VK_E:
-                movement &= ~MOVE_UP;
-                break;
-            case KeyEvent.VK_C:
-                movement &= ~MOVE_DOWN;
-                break;
-            case KeyEvent.VK_SHIFT:
-                movement &= ~MOVE_FAST;
-                break;
-            case KeyEvent.VK_CONTROL:
-                movement &= ~MOVE_SLOW;
-                break;
+        if (e.isControlDown()) {
+        } else if (e.isAltDown()) {
+
+        } else {
+            switch (e.getKeyCode()) {
+                case KeyEvent.VK_W:
+                    movement &= ~MOVE_FORWARDS;
+                    break;
+                case KeyEvent.VK_S:
+                    movement &= ~MOVE_BACKWARDS;
+                    break;
+                case KeyEvent.VK_A:
+                    movement &= ~MOVE_LEFT;
+                    break;
+                case KeyEvent.VK_D:
+                    movement &= ~MOVE_RIGHT;
+                    break;
+                case KeyEvent.VK_E:
+                    movement &= ~MOVE_UP;
+                    break;
+                case KeyEvent.VK_C:
+                    movement &= ~MOVE_DOWN;
+                    break;
+                case KeyEvent.VK_SHIFT:
+                    movement &= ~MOVE_FAST;
+                    break;
+                case KeyEvent.VK_CONTROL:
+                    movement &= ~MOVE_SLOW;
+                    break;
+            }
         }
     }
 
     public void keyTyped(KeyEvent e){
-        switch (e.getKeyChar()) {
-            case 'i':
-                JFrame guiFrame = new JFrame();
-                selectedColor = JColorChooser.showDialog(guiFrame, "Pick a Color", selectedColor);
-                long color = Color.setColor(selectedColor);
-                System.out.println(Color.toString(color) +
-                        " @ 1%: " + Color.toString(Color.illuminate(color, 0.01)) +
-                        " 50% : " + Color.toString(Color.illuminate(color, 0.5)) +
-                        " 100% : " + Color.toString(Color.illuminate(color, 1.0))
-                );
-                break;
-            case 's':
-                tree.save("Test");
-                break;
-            case '?':
-                int test = 1;
-                break;
-        }
     }
 
     public void mouseEntered(MouseEvent e){
@@ -278,7 +292,7 @@ viewPoint.set(30, 210, -206);
                     center.add(new Point3i(0, -(int)Math.copySign(tree.stride(), tree.pickRay.y), 0));
                     break;
             }
-            tree.setVoxelPoint(center, (int)Color.setColor(selectedColor));
+            tree.setVoxelPoint(center, selectedMaterial);
         }
     }
 

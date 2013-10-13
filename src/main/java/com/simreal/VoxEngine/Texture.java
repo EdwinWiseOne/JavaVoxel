@@ -14,7 +14,7 @@ package com.simreal.VoxEngine;
  * Better rank ordering method by Stefan Gustavson in 2012.
  * ------------------------------------------------------------------
  *
- *  Density transformations generate a value from 0..255
+ *  Value transformations generate a value from 0..1
  */
 public class Texture {
     // --------------------------------------
@@ -23,10 +23,8 @@ public class Texture {
     public static final int REFLECT = 0x01;     // fabs
     public static final int SQUARE = 0X02;      // pow(2)
     public static final int CURL = 0x04;        // cos, uses decay
-    public static final int TAN2CLAMP = 0x08;   // sealevel soft clamp
-    public static final int YCLAMP = 0x10;      // sealevel clamp
+    public static final int BANDCLAMP = 0x08;   // band soft clamp
     public static final int INVERT = 0x20;      // 255 - w
-    public static final int THRESH = 0x40;      // uses threshold
     public static final int QUANT = 0x80;       // uses quantLevel
 
     // --------------------------------------
@@ -34,27 +32,30 @@ public class Texture {
     // --------------------------------------
     public int transform = 0x00;    // transformation control flags
     public double scale = 1.0;      // input scaling factor
-    public double decay = 1;           // Curl scaling factor; matches y or z scaling
-    public int threshold = 0;       // range 0..255
-    public int quantLevel = 0;      // range 1..7
-    public int seaLevel = 0xC0;     // range 0..255
+    public double decay = 1.0;      // Curl scaling factor; matches y or z scaling
+    public double band = 0.0;   // Clamp band
+    public int quantLevel = 0;      // Number of quantization levels
 
 
-    public int density(double x, double y) {
+    public static int toByte(double w) {
+        return (int)(w * 255);
+    }
+
+    public double value(double x, double y) {
         return xform(y, noise(x * scale, y * scale));
     }
 
-    public int density(double x, double y, double z) {
+    public double value(double x, double y, double z) {
         return xform(z, noise(x * scale, y * scale, z * scale));
     }
 
-    private int xform(double y, double w) {
+    public double xform(double y, double w) {
         // --------------------------------------
         // w is (-1 .. +1)
         // --------------------------------------
         if ((transform & CURL) != 0) {
             double twist = decay * 45.0;
-            w = Math.cos(y/twist + w*twist);
+            w = Math.cos(Math.toRadians(y/twist + w*twist));
         }
 
         if ((transform & SQUARE) != 0) {
@@ -66,52 +67,33 @@ public class Texture {
         }
 
         // --------------------------------------
-        // Covert w to the [0..255] range
+        // Covert w to the [0..1] range
         // --------------------------------------
-        if ((transform & (REFLECT | SQUARE)) != 0) {
-            w *= 256.0;
-        } else {
-            w = (w * 128.0) + 127.0;
+        if ((transform & (REFLECT | SQUARE)) == 0) {
+            w = (w * 0.5) + 0.5;
         }
 
-        if ((transform & TAN2CLAMP) != 0) {
-            double dy = fastfabs(y - seaLevel);
-            if (dy > 128.0) {
-                dy = 128.0;
-            }
-            double t = Math.tan(dy/128.0);
-            w *= t*t*t;
-        }
+        if ((transform & BANDCLAMP) != 0) {
+            double dw = fastfabs(w - band);
+            double t = Math.cos(dw * Math.PI);
+            w = Math.pow(t, 10);
+       }
 
-        if ((transform & YCLAMP) != 0) {
-            if (y < seaLevel) {
-                w = 0.0;
-            }
+       // --------------------------------------
+        // Clamp... should not be needed?
+        // --------------------------------------
+//        if (w < 0.0) { w = 0.0; }
+//        if (w > 1.0) { w = 1.0; }
+
+        if ((transform & QUANT) != 0) {
+            w = (double)((int)(w * quantLevel)) / (double)quantLevel;
         }
 
         if ((transform & INVERT) != 0) {
-            w = 255.0-w;
+            w = 1.0 - w;
         }
 
-        // --------------------------------------
-        // Clamp... should not be needed?
-        // --------------------------------------
-        int out = fastfloor(w);
-        if (out < 0) { out = 0; }
-        if (out > 255) { out = 255; }
-
-        if ((transform & THRESH) != 0) {
-            if (out < threshold) {
-                out = 0;
-            }
-        }
-
-        if ((transform & QUANT) != 0) {
-            out >>= quantLevel;
-            out <<= quantLevel;
-        }
-
-        return out;
+        return w;
     }
 
     // --------------------------------------
