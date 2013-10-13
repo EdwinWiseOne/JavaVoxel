@@ -1,5 +1,4 @@
-
-import com.simreal.VoxEngine.Color;
+import com.simreal.VoxEngine.Material;
 import com.simreal.VoxEngine.VoxTree;
 
 import javax.swing.JFrame;
@@ -52,9 +51,11 @@ public class BrickEditor extends Canvas implements Runnable {
         int offset = stride >> 1;
 
         // Floor of black
-        for (int x=0; x<tree.edgeLength(); ++x){
-            for (int y=0; y<tree.edgeLength(); ++y){
-                tree.setVoxelPoint(new Point3i((x*stride)+offset, 0, (y*stride)+offset), (int)Color.setColor(30,30,30,255));
+        int value;
+        for (int x=0; x<tree.breadth(); ++x){
+            for (int y=0; y<tree.breadth(); ++y){
+                value = (y * tree.breadth()) + x;
+                tree.setVoxelPoint(new Point3i((x*stride)+offset, 0, (y*stride)+offset), (long) Material.setMaterial(255, 255, 255, 255-value, value, value));
             }
         }
 

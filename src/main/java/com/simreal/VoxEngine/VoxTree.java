@@ -1,10 +1,9 @@
 package com.simreal.VoxEngine;
 
-import com.simreal.VoxEngine.brick.BrickFactory;
-
 import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
+import com.simreal.VoxEngine.brick.BrickFactory;
 
 import javax.vecmath.Point3d;
 import javax.vecmath.Point3i;
@@ -12,6 +11,7 @@ import javax.vecmath.Vector3d;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.Random;
+import java.util.jar.Attributes;
 
 // QSC powered speakers
 
@@ -52,7 +52,7 @@ public class VoxTree {
         }
     }
 
-    private static final int PICK_DEPTH = 256;
+    private static final int PICK_DEPTH = 256 * 1;
 
     int depth;
     int breadth;
@@ -107,9 +107,9 @@ public class VoxTree {
         // Initialize the node pool
         // --------------------------------------
         nodePool = new NodePool(nodePoolSize);
-
+        // Root node
         int nodeIndex = nodePool.getFree();
-        nodePool.set(nodeIndex, Node.setLeaf(nodePool.node(nodeIndex), true));
+        nodePool.set(nodeIndex, Node.setLeaf(nodePool.node(nodeIndex), true), 0L, 0L);
 
         // --------------------------------------
         // Define the world cube
@@ -174,7 +174,7 @@ public class VoxTree {
         nodePool = pool;
     }
 
-    public void setVoxelPoint(Point3i voxel, int color){
+    public void setVoxelPoint(Point3i voxel, long material){
         if ( (voxel.x < nearTopLeft.x)
             || (voxel.y < nearTopLeft.y)
             || (voxel.z < nearTopLeft.z)
@@ -184,17 +184,16 @@ public class VoxTree {
             return;
         }
         long path = Path.fromPosition(voxel, this.edgeLength, depth);
-        setVoxelPath(path, color);
+        setVoxelPath(path, material);
     }
 
 
-    public void setVoxelPath(long path, int color) {
-        int nodeIndex = getIndexForPath(path, true);
-//        System.out.println("Set " + Path.toString(path) + " (" + nodeIndex + ") to " + Color.toString(color));
-        nodePool.set(nodeIndex, Node.setColor(nodePool.node(nodeIndex), color));
+    public void setVoxelPath(long path, long material) {
 
-        int depth = Path.depth(path);
-        //path = Path.setDepth(path, depth-1);
+        int nodeIndex = getIndexForPath(path, true);
+        nodePool.setMaterial(nodeIndex, material);
+        nodePool.setPath(nodeIndex, path);
+
         refineVoxelPath(path);
     }
 
@@ -210,12 +209,12 @@ public class VoxTree {
         if (nodeIndex == 0) return 0L;
 
         // refineVoxelPath(path);
-        return Node.color(nodePool.node(nodeIndex));
+        return nodePool.material(nodeIndex);
     }
 
-    private long splitVoxel(int nodeIndex) {
-        long node = nodePool.node(nodeIndex);
-        long childNode = Node.setDepth(node, (byte)(Node.depth(node)+1));
+    private int splitVoxel(int nodeIndex) {
+        int node = nodePool.node(nodeIndex);
+        int childNode = Node.setDepth(node, (byte)(Node.depth(node)+1));
 
 //        System.out.println("Split: populating " + nodeIndex);
 
@@ -223,9 +222,11 @@ public class VoxTree {
             int childIndex = nodePool.getFree();
             if (idx == 0) {
                 node = Node.setChild(Node.setLeaf(node, false), childIndex);
-                nodePool.set(nodeIndex, node);
+                nodePool.setNode(nodeIndex, node);
             }
-            nodePool.set(childIndex, childNode);
+            nodePool.setNode(childIndex, childNode);
+            nodePool.setMaterial(childIndex, nodePool.material(nodeIndex));
+            nodePool.setPath(childIndex, Path.addChild(nodePool.path(nodeIndex), idx));
         }
         return node;
     }
@@ -243,15 +244,14 @@ public class VoxTree {
     private boolean refineVoxel(long path, boolean allowMerge) {
         int nodeIndex = getIndexForPath(path, true);
 
-        long parentNode = nodePool.node(nodeIndex);
+        int parentNode = nodePool.node(nodeIndex);
         int childIndex = Node.child(parentNode);
 
         // If all children are the same color, coalesce into this parent
-        long color = Node.color(nodePool.node(childIndex));
+        long color = nodePool.material(childIndex);
         boolean merge = true;
         for (int idx=1; idx<8; ++idx){
-            long node = nodePool.node(childIndex+idx);
-            if (color != Node.color(node)) {
+            if (color != nodePool.material(childIndex+idx)) {
                 merge = false;
                 break;
             }
@@ -260,7 +260,8 @@ public class VoxTree {
         if (merge && allowMerge) {
 //            System.out.println("Refine: trimming " + nodeIndex);
 
-            nodePool.set(nodeIndex, Node.setLeaf(Node.setColor(parentNode, color), true));
+            nodePool.setNode(nodeIndex, Node.setLeaf(parentNode, true));
+            nodePool.setMaterial(nodeIndex, color);
             for (int idx=7; idx>=0; --idx) {
                 nodePool.putFree(childIndex + idx);
             }
@@ -272,22 +273,28 @@ public class VoxTree {
         long green = 0;
         long blue = 0;
         long alpha = 0;
+        long albedo = 0;
+        long reflectance = 0;
         for (int idx=0; idx<8; ++idx){
-            long node = nodePool.node(childIndex+idx);
-            red += Node.red(node);
-            green += Node.green(node);
-            blue += Node.blue(node);
-            alpha += Node.alpha(node);
+            long material = nodePool.material(childIndex + idx);
+            red += Material.red(material);
+            green += Material.green(material);
+            blue += Material.blue(material);
+            alpha += Material.alpha(material);
+            albedo += Material.albedo(material);
+            reflectance += Material.reflectance(material);
         }
-        nodePool.set(nodeIndex,  Node.setColor(parentNode, (int) (red >>> 3), (int) (green >>> 3), (int) (blue >>> 3), (int) (alpha >>> 3)));
+        nodePool.setMaterial(nodeIndex,
+                Material.setMaterial((int) (red >>> 3), (int) (green >>> 3), (int) (blue >>> 3),
+                        (int) (alpha >>> 3), (int) (albedo >>> 3), (int) (reflectance >>> 3)));
         return false;
     }
 
     public int getIndexForPath(long path, boolean split) {
         int depth = Path.depth(path);
         int nodeIndex = 0;
-        long node;
-        long childNode;
+        int node;
+//        int childNode;
         for (int cnt=0; cnt<depth; ++cnt) {
             node = nodePool.node(nodeIndex);
 
@@ -351,22 +358,24 @@ public class VoxTree {
         double tmin = Math.max(t0.x, Math.max(t0.y, t0.z));
         double tmax = Math.min(t1.x, Math.min(t1.y, t1.z));
 
-        long color = 0;
+        long material = 0L;
         if ( (tmin < tmax) && (tmax > 0.0d)){
-            color = castSubtree(t0, t1, pick);
-            if (pick || (Color.alpha(color) >= 250)) return color;
+            material = castSubtree(t0, t1, inRay, pick);
+            if (pick || (Material.alpha(material) >= 250)) return material;
         }
 
         double screenFactor = 128.0;
         double tick = (double)(System.currentTimeMillis()-startTime) / 1000.0;
-        color = Color.blend(color, Color.setColor(0, 0, 0, Texture.toByte(BrickFactory.texture().value(inRay.x*screenFactor, inRay.y*screenFactor, tick))));
-        return Color.blend(color, Color.setColor(rand.nextInt(256), 0, 0, 255));
+        material = Material.blend(material, Material.setMaterial(0, 0, 0,
+                Texture.toByte(BrickFactory.texture().value(inRay.x * screenFactor, inRay.y * screenFactor, tick)),
+                32, 32));
+        return Material.blend(material, Material.setMaterial(rand.nextInt(256), 0, 0, 255, 255, 32));
     }
 
     /**
      *
      */
-    private long castSubtree(Point3d t0, Point3d t1, boolean pick){
+    private long castSubtree(Point3d t0, Point3d t1, Vector3d view, boolean pick){
 
         // Error condition early exit
         if ((t1.x < 0.0) || (t1.y < 0.0) || (t1.z < 0.0)) {
@@ -377,7 +386,7 @@ public class VoxTree {
 
         Point3d tM1 = new Point3d();
         Point3i tOct = new Point3i();
-        long rgba = 0L;
+        long material = 0L;
 
         tM1.add(t0, t1);
         tM1.scale(0.5);
@@ -395,7 +404,7 @@ public class VoxTree {
             state.set(stateStack[--stateStackTop]);
 
             // Child...
-            long node = nodePool.node(state.nodeIndex);
+            int node = nodePool.node(state.nodeIndex);
             if ( Node.isLeaf(node)
                     && pick
                     && (Node.depth(node) < depth)) {
@@ -405,15 +414,14 @@ public class VoxTree {
                 if (tmin <= PICK_DEPTH) {
                     // If picking, we must traverse to the very bottom...
                     node = splitVoxel(state.nodeIndex);
-                    nodePool.set(state.nodeIndex, node);
+                    nodePool.setNode(state.nodeIndex, node);
                 }
-
             }
 
             if (Node.isLeaf(node)) {
+                long newMaterial = nodePool.material(state.nodeIndex);
                 // ... value
-                long newRgba = Node.color(node);
-                if (newRgba > 0) {
+                if (newMaterial > 0) {
                     if (pick) {
                         double tmin = Math.max(state.t0.x, Math.max(state.t0.y, state.t0.z));
 
@@ -428,7 +436,7 @@ public class VoxTree {
                                 pickNodeIndex = state.nodeIndex;
                                 pickFacet = facet;
 
-                                int index = getIndexForPath(pickNodePath, true);
+//                                int index = getIndexForPath(pickNodePath, true);
                                 //System.out.println("Picked " + pickNodeIndex + " -> " + Path.toString(pickNodePath) + " -> " + index);
                             }
                         }
@@ -444,27 +452,22 @@ public class VoxTree {
 
                     // Lighting model!
                     // Fake it for now, no lights yet
-                    Vector3d diffuseLight;
-                    double diffuseCoefficient = 0.4;
-                    double ambientCoefficient = 0.5;
-                    // TODO: Specular, distance attenuation, atmospheric effect, etc
-
-                    double elevation = Math.toRadians(-10);
-                    double heading = Math.toRadians(45);
+                    double elevation = Math.toRadians(System.currentTimeMillis() / 25);
+                    double heading = Math.toRadians(System.currentTimeMillis() / 73);
                     double cosElevation = Math.cos(elevation);
-                    diffuseLight = new Vector3d(Math.cos(heading)*cosElevation, Math.sin(elevation), Math.sin(heading)*cosElevation);
+                    Vector3d light = new Vector3d(Math.cos(heading)*cosElevation, Math.sin(elevation), Math.sin(heading)*cosElevation);
 
                     Vector3d normal = new Vector3d(facing);
                     if ((facet & mirror) > 0)
                         normal.scale(-1);
-                    double illumination = ambientCoefficient + diffuseCoefficient*diffuseLight.dot(normal);
 
                     if ((pickNodeIndex > 0) && (pickNodeIndex == state.nodeIndex) && (pickFacet == facet) ){
-                        double cycle = (double)System.currentTimeMillis() / 125.0;
-                        illumination = (1.5 - (Math.pow(Math.cos(cycle), 3.0) * .5));
+                        light.scale(Lighting.pulse());
                     }
-                    rgba = Color.blend(rgba, Color.illuminate(newRgba, illumination));
-                    if (Color.alpha(rgba) > 250) return rgba;
+
+                    material = Material.blend(material, Lighting.illuminate(newMaterial, normal, light, view));
+//                    material = Material.blend(material, newMaterial);
+                    if (Material.alpha(material) >= 250) return material;
                 }
 
             } else {
@@ -528,12 +531,12 @@ public class VoxTree {
                 newState.nodePath = Path.addChild(state.nodePath, octantMirror);
                 if (stateStackTop > depth) {
                     System.out.println("STATE STACK OVERFLOW");
-                    return rgba;
+                    return material;
                 }
                 stateStack[stateStackTop++].set(newState);
             }
         }
-        return rgba;
+        return material;
     }
 
     /**
@@ -598,7 +601,8 @@ public class VoxTree {
     // --------------------------------------
     // Save, Load, and related utilities
     // --------------------------------------
-    public void save(String name) {
+
+    public void save(String name, Attributes tags) {
         NodePool savePool = compressTree();
 
         // TODO: Shift over to database storage
@@ -619,6 +623,11 @@ public class VoxTree {
 
             gen.writeStartObject();
             gen.writeNumberField("size", savePool.size());
+            for (Object key : tags.keySet()) {
+                String keyStr = key.toString();
+                gen.writeStringField(keyStr, tags.getValue(keyStr));
+                System.out.println(keyStr + " = " + tags.getValue(keyStr));
+            }
             gen.writeArrayFieldStart("pool");
             // To make more clean, would need to store pool as ByteBuffer (and cast to LongBuffer, etc)
             for (int index=0; index<savePool.size(); ++index) {
@@ -634,8 +643,11 @@ public class VoxTree {
     }
 
     private void copyNodeSubtree(NodePool srcPool, int srcIndex, NodePool dstPool) {
-        long srcNode = srcPool.node(srcIndex);
-        dstPool.set(dstPool.getFree(), srcNode);
+        int srcNode = srcPool.node(srcIndex);
+        int dstIndex = dstPool.getFree();
+        dstPool.setNode(dstIndex, srcNode);
+        dstPool.setMaterial(dstIndex, srcPool.material(srcIndex));
+        // TODO: Path?
 
         if (!Node.isLeaf(srcNode)) {
             int tile = Node.child(srcNode);

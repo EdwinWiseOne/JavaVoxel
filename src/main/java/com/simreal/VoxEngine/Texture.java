@@ -23,10 +23,8 @@ public class Texture {
     public static final int REFLECT = 0x01;     // fabs
     public static final int SQUARE = 0X02;      // pow(2)
     public static final int CURL = 0x04;        // cos, uses decay
-    public static final int TAN2CLAMP = 0x08;   // sealevel soft clamp
-    public static final int YCLAMP = 0x10;      // sealevel clamp
+    public static final int BANDCLAMP = 0x08;   // band soft clamp
     public static final int INVERT = 0x20;      // 255 - w
-    public static final int THRESH = 0x40;      // uses threshold
     public static final int QUANT = 0x80;       // uses quantLevel
 
     // --------------------------------------
@@ -35,8 +33,7 @@ public class Texture {
     public int transform = 0x00;    // transformation control flags
     public double scale = 1.0;      // input scaling factor
     public double decay = 1.0;      // Curl scaling factor; matches y or z scaling
-    public double threshold = 0.0;  //
-    public double seaLevel = 0.0;   //
+    public double band = 0.0;   // Clamp band
     public int quantLevel = 0;      // Number of quantization levels
 
 
@@ -52,7 +49,7 @@ public class Texture {
         return xform(z, noise(x * scale, y * scale, z * scale));
     }
 
-    private double xform(double y, double w) {
+    public double xform(double y, double w) {
         // --------------------------------------
         // w is (-1 .. +1)
         // --------------------------------------
@@ -76,36 +73,24 @@ public class Texture {
             w = (w * 0.5) + 0.5;
         }
 
-        if ((transform & TAN2CLAMP) != 0) {
-            double dw = fastfabs(w - seaLevel);
-            double t = Math.tan(dw);
-            w *= t * t * t;
-        }
+        if ((transform & BANDCLAMP) != 0) {
+            double dw = fastfabs(w - band);
+            double t = Math.cos(dw * Math.PI);
+            w = Math.pow(t, 10);
+       }
 
-        if ((transform & YCLAMP) != 0) {
-            if (y < seaLevel) {
-                w = 0.0;
-            }
+       // --------------------------------------
+        // Clamp... should not be needed?
+        // --------------------------------------
+//        if (w < 0.0) { w = 0.0; }
+//        if (w > 1.0) { w = 1.0; }
+
+        if ((transform & QUANT) != 0) {
+            w = (double)((int)(w * quantLevel)) / (double)quantLevel;
         }
 
         if ((transform & INVERT) != 0) {
             w = 1.0 - w;
-        }
-
-        // --------------------------------------
-        // Clamp... should not be needed?
-        // --------------------------------------
-        if (w < 0.0) { w = 0.0; }
-        if (w > 1.0) { w = 1.0; }
-
-        if ((transform & THRESH) != 0) {
-            if (w < threshold) {
-                w = 0.0;
-            }
-        }
-
-        if ((transform & QUANT) != 0) {
-            w = (double)((int)(w * quantLevel)) / (double)quantLevel;
         }
 
         return w;

@@ -2,7 +2,9 @@ package com.simreal.VoxEngine;
 
 public class NodePool {
     private int numNodes;
-    private long[] pool;
+    private int[] nodes;
+    private long[] materials;
+    private long[] paths;
     private int firstFreeNode;
 
     public static final int NO_FREE_NODE_INDEX = -1;
@@ -10,12 +12,17 @@ public class NodePool {
     public NodePool(int size) {
         numNodes = size;
 
-        pool = new long[numNodes];
+        nodes = new int[numNodes];
+        materials = new long[numNodes];
+        paths = new long[numNodes];
+
         // Chain together all of the free nodes
         for (int idx=0; idx<(numNodes-1); ++idx) {
-            pool[idx] = Node.setChild(0L, idx+1);
+            nodes[idx] = Node.setChild(0, idx+1);
+            materials[idx] = 0L;
+            paths[idx] = 0L;
         }
-        pool[numNodes-1] = Node.END_OF_FREE_NODES;
+        nodes[numNodes-1] = Node.END_OF_FREE_NODES;
 
         firstFreeNode = 0;
     }
@@ -24,17 +31,23 @@ public class NodePool {
         return numNodes;
     }
 
-    public long[] pool() {
-        return pool;
+    public int[] nodes() {
+        return nodes;
+    }
+    public long[] materials() {
+        return materials;
+    }
+    public long[] paths() {
+        return paths;
     }
 
     public int getFree() {
         int freeNodeIndex = firstFreeNode;
-        firstFreeNode = Node.child(pool[freeNodeIndex]);
+        firstFreeNode = Node.child(nodes[freeNodeIndex]);
         if (firstFreeNode == Node.END_OF_FREE_NODES) {
             firstFreeNode = NO_FREE_NODE_INDEX;
         }
-        pool[freeNodeIndex] = Node.setUsed(pool[freeNodeIndex], true);
+        nodes[freeNodeIndex] = Node.setUsed(nodes[freeNodeIndex], true);
         return freeNodeIndex;
     }
 
@@ -44,31 +57,78 @@ public class NodePool {
             nextFree = Node.END_OF_FREE_NODES;
         }
 
-        pool[nodeIndex] = Node.setUsed(Node.setChild(0L, nextFree), false);
+        nodes[nodeIndex] = Node.setUsed(Node.setChild(0, nextFree), false);
         firstFreeNode = nodeIndex;
     }
 
     // TODO: Move from RuntimeException to Exception.  Doing Runtime for now because I don't want to
     // update the entire call chain.
-    public long node(int index)
+    public int node(int index)
         throws RuntimeException {
 
         if ((index < 0) || (index >= numNodes)) {
             throw new RuntimeException("NodePool index out of bounds");
         }
-        return pool[index];
+        return nodes[index];
+    }
+    public long material(int index)
+            throws RuntimeException {
+
+        if ((index < 0) || (index >= numNodes)) {
+            throw new RuntimeException("NodePool index out of bounds");
+        }
+        return materials[index];
+    }
+    public long path(int index)
+            throws RuntimeException {
+
+        if ((index < 0) || (index >= numNodes)) {
+            throw new RuntimeException("NodePool index out of bounds");
+        }
+        return paths[index];
     }
 
-    public void set(int index, long node)
+    public void set(int index, int node, long material, long path)
         throws RuntimeException {
 
         if ((index < 0) || (index >= numNodes)) {
             throw new RuntimeException("NodePool index out of bounds");
         }
 
-        pool[index] = node;
+        nodes[index] = node;
+        materials[index] = material;
+        paths[index] = path;
     }
 
+    public void setNode(int index, int node)
+            throws RuntimeException {
+
+        if ((index < 0) || (index >= numNodes)) {
+            throw new RuntimeException("NodePool index out of bounds");
+        }
+
+        nodes[index] = node;
+    }
+
+    public void setMaterial(int index, long material)
+            throws RuntimeException {
+
+        if ((index < 0) || (index >= numNodes)) {
+            throw new RuntimeException("NodePool index out of bounds");
+        }
+
+        materials[index] = material;
+    }
+
+    public void setPath(int index, long path)
+            throws RuntimeException {
+
+        if ((index < 0) || (index >= numNodes)) {
+            throw new RuntimeException("NodePool index out of bounds");
+        }
+
+        paths[index] = path;
+    }
 
     // --------------------------------------
     // Analysis and debugging
@@ -91,9 +151,9 @@ public class NodePool {
     Statistics analyze() {
         Statistics stats = new Statistics();
 
-        long node;
+        int node;
         for (int idx=0; idx<numNodes; ++idx){
-            node = pool[idx];
+            node = nodes[idx];
             if (Node.isUsed(node)) {
                 ++stats.numUsed;
                 if (Node.isLeaf(node))
@@ -117,10 +177,14 @@ public class NodePool {
         result.append("   (").append(stats.numNodes).append(" nodes, ").append(stats.numLeaves).append(" leaves)").append(NEW_LINE);
         boolean elided = false;
         for (int idx=0; idx<64; ++idx){
-            if (Node.isUsed(pool[idx])) {
+            if (Node.isUsed(nodes[idx])) {
                 result.append(idx);
                 result.append(": ");
-                result.append(Node.toString(pool[idx]));
+                result.append(Node.toString(nodes[idx]));
+                result.append(" - ");
+                result.append(Material.toString(materials[idx]));
+                result.append(" - ");
+                result.append(Path.toString(paths[idx]));
                 result.append(NEW_LINE);
                 elided = false;
             } else {
