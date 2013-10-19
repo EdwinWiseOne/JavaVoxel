@@ -48,6 +48,10 @@ class Node {
         return (node & FLAG_LEAF_MASK) == FLAG_LEAF_MASK;
     }
 
+    static boolean isNode(int node){
+        return (node & FLAG_LEAF_MASK) == 0;
+    }
+
     static int setUsed(int node, boolean used){
         if (used){
             return (node | FLAG_USED_MASK);

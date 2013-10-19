@@ -274,15 +274,45 @@ public class Path {
         return new Point3i(xm, ym, zm);
     }
 
+    public static long fromID(long id, int depth) {
+        long path = 0L;
+        int child;
+
+        for (int cnt=(depth-1); cnt>=0; --cnt) {
+            child = (int)(id & 0x07L);
+            id >>= 3;
+
+            path = Path.setChild(path, cnt, child);
+        }
+
+        return Path.setDepth(path, depth);
+   }
+
     /**
      * Parse a path into an ID sequence, by intermixing the bits.  This should turn the X, Y, Z into
      * an ID long that still preserves locality.
+     *
+     * IDs are specific to tree depth; the first choice is at the MSB, the last choice is LSB, but the
+     * entire path is shifted into the ID from the LSB, so the tree depth controls the magnitude of the
+     * ID... and trees of different depths can not intermingle in the ID space.
+     *
+     * Essentially, we move the path from the MSB to the LSB.
      *
      * @param path
      * @return
      */
     public static long toID(long path) {
-        return 0L;
+        long id = 0L;
+        int child;
+
+        int depth = Path.depth(path);
+        for (int cnt=0; cnt<depth; ++cnt) {
+            child = Path.child(path, cnt);
+
+            id <<= 3;
+            id |= child;
+        }
+        return id;
     }
 
     static String toString(long path){

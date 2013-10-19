@@ -1,6 +1,8 @@
 package com.simreal.VoxEngine.brick;
 
+import com.google.common.base.Optional;
 import com.simreal.VoxEngine.Material;
+import com.simreal.VoxEngine.NodePool;
 import com.simreal.VoxEngine.Texture;
 import com.simreal.VoxEngine.VoxTree;
 
@@ -27,7 +29,9 @@ public class BrickFactory {
             new BuildAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } },
     };
 
-    private static VoxTree _tree = null;
+    private static double EPSILON = 1e-9;
+
+//    private static VoxTree _tree = null;
     private static Texture _texture = new Texture();
     private static String _name = "test";
 
@@ -164,22 +168,77 @@ public class BrickFactory {
                 ", reflect " + reflect +
                 ", square " + square );
 
-        _tree = tree;
+//        _tree = tree;
         buildActions[typeIdx].build(tree, _texture);
     }
 
-    public static void save() {
+    public static void save(VoxTree tree) {
         Attributes tags = new Attributes();
+
+        System.out.println("Saving '" + _name + "'");
 
         tags.put(new Attributes.Name("scale"), new Double(_texture.scale).toString());
         tags.put(new Attributes.Name("decay"), new Double(_texture.decay).toString());
         tags.put(new Attributes.Name("band"), new Double(_texture.band).toString());
         tags.put(new Attributes.Name("quant"), new Integer(_texture.quantLevel).toString());
         tags.put(new Attributes.Name("transform"), new Integer(_texture.transform).toString());
+        tags.put(new Attributes.Name("invert"), new Boolean(invert).toString());
+        tags.put(new Attributes.Name("reflect"), new Boolean(reflect).toString());
+        tags.put(new Attributes.Name("square"), new Boolean(square).toString());
 
-        _tree.save(_name, tags);
+        tree.save(_name, tags);
     }
 
+
+    public static void load(VoxTree tree) {
+        Attributes tags = new Attributes();
+
+        NodePool loadPool = tree.load(_name, tags);
+        if (null == loadPool) {
+            return;
+        }
+
+        System.out.println("Loading '" + _name + "'");
+
+        tree.setPool(loadPool);
+
+        invert = new Boolean(tags.getValue("invert"));
+        reflect = new Boolean(tags.getValue("reflect"));
+        square = new Boolean(tags.getValue("square"));
+
+        _texture.scale = new Double(Optional.of(tags.getValue("scale")).or("0.0"));
+        _texture.decay = new Double(tags.getValue("decay"));
+        _texture.band =  new Double(tags.getValue("band"));
+        _texture.quantLevel =  new Integer(tags.getValue("quant"));
+        _texture.transform =  new Integer(tags.getValue("transform"));
+
+        scaleIdx = findIndexForValue(_texture.scale, scaleValue);
+        decayIdx = findIndexForValue(_texture.decay, decayValue);
+        bandIdx = findIndexForValue(_texture.band, bandValue);
+        quantIdx = findIndexForValue(_texture.quantLevel, quantValue);
+    }
+
+    private static int findIndexForValue(double value, double[] values) {
+        int index = 0;
+        for (double test : values) {
+            if (Math.abs(test - value) < EPSILON) {
+                return index;
+            }
+            ++index;
+        }
+        return 0;
+    }
+
+    private static int findIndexForValue(int value, int[] values) {
+        int index = 0;
+        for (int test : values) {
+            if (test == value) {
+                return index;
+            }
+            ++index;
+        }
+        return 0;
+    }
 
     private static boolean isSkin(VoxTree tree, int x, int y, int z, int w) {
         int edge = tree.breadth() - 1;

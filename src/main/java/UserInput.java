@@ -1,5 +1,6 @@
-
+import com.simreal.VoxEngine.Database;
 import com.simreal.VoxEngine.Material;
+import com.simreal.VoxEngine.NodePool;
 import com.simreal.VoxEngine.Path;
 import com.simreal.VoxEngine.VoxTree;
 import com.simreal.VoxEngine.brick.BrickFactory;
@@ -163,25 +164,30 @@ viewPoint.set(30, 210, -206);
         //System.out.println("Pressed " + e.getKeyCode() + ", " + e.getKeyChar());
         if (e.isControlDown()) {
             switch (e.getKeyCode()) {
-                case KeyEvent.VK_I:
-                    JFrame guiFrame = new JFrame();
-                    selectedColor = JColorChooser.showDialog(guiFrame, "Pick a Material", selectedColor);
-                    selectedMaterial = Material.setMaterial(selectedColor, 128, 32);
-                    break;
                 default:
                     BrickFactory.keyPressed(e, tree);
                     break;
             }
         } else if (e.isAltDown()) {
+            Database db;
+
             switch (e.getKeyCode()) {
+                case KeyEvent.VK_I:
+                    JFrame guiFrame = new JFrame();
+                    selectedColor = JColorChooser.showDialog(guiFrame, "Pick a Material", selectedColor);
+                    selectedMaterial = Material.setMaterial(selectedColor, 128, 32);
+                    break;
                 case KeyEvent.VK_S:
-                    BrickFactory.save();
+//                    BrickFactory.save(tree);
+                    db = new Database();
+                    db.putBrick("test", tree.nodePool().compress());
                     break;
-/*
                 case KeyEvent.VK_L:
-                    BrickFactory.load();
+//                    BrickFactory.load(tree);
+                    db = new Database();
+                    NodePool loadPool = db.getBrick("test");
+                    tree.setPool(loadPool);
                     break;
-*/
             }
 
         } else {

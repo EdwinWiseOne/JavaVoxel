@@ -1,15 +1,19 @@
 package com.simreal.VoxEngine;
 
-import com.fasterxml.jackson.core.JsonEncoding;
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonGenerator;
 import com.simreal.VoxEngine.brick.BrickFactory;
+import org.codehaus.jackson.JsonEncoding;
+import org.codehaus.jackson.JsonFactory;
+import org.codehaus.jackson.JsonGenerator;
+import org.codehaus.jackson.JsonParser;
+import org.codehaus.jackson.JsonToken;
 
 import javax.vecmath.Point3d;
 import javax.vecmath.Point3i;
 import javax.vecmath.Vector3d;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.util.Arrays;
 import java.util.Random;
 import java.util.jar.Attributes;
 
@@ -605,21 +609,18 @@ public class VoxTree {
     public void save(String name, Attributes tags) {
         NodePool savePool = compressTree();
 
+//        System.out.println(nodePool);
+//        System.out.println(savePool);
+
         // TODO: Shift over to database storage
 
+        // TODO: materials and paths need saving (and loading)
+
         JsonFactory jsonFactory = new JsonFactory();
-//        SmileFactory smileFactory = new SmileFactory();
-        // Output: OutputStream is best; Writer second best;
-        // Input: byte[] is best if you have it; InputStream second best; followed by Reader -- and in every case, do NOT try reading input into a String!
-//        StringWriter output = new StringWriter();
         try {
             FileOutputStream  output = new FileOutputStream("bricks" + File.separator + name + ".node");
 
-//            ObjectMapper mapper = new ObjectMapper(); // can reuse, share globally
-//            mapper.writeValue(output, nodePool);
-
             JsonGenerator gen = jsonFactory.createJsonGenerator(output, JsonEncoding.UTF8); // or Stream, Reader
-//            SmileGenerator gen = smileFactory.createGenerator(output, JsonEncoding.UTF8);
 
             gen.writeStartObject();
             gen.writeNumberField("size", savePool.size());
@@ -628,33 +629,128 @@ public class VoxTree {
                 gen.writeStringField(keyStr, tags.getValue(keyStr));
                 System.out.println(keyStr + " = " + tags.getValue(keyStr));
             }
-            gen.writeArrayFieldStart("pool");
+            gen.writeArrayFieldStart("nodes");
             // To make more clean, would need to store pool as ByteBuffer (and cast to LongBuffer, etc)
             for (int index=0; index<savePool.size(); ++index) {
                 gen.writeNumber(savePool.node(index));
             }
             gen.writeEndArray();
+
+            gen.writeArrayFieldStart("materials");
+            // To make more clean, would need to store pool as ByteBuffer (and cast to LongBuffer, etc)
+            for (int index=0; index<savePool.size(); ++index) {
+                gen.writeNumber(savePool.material(index));
+            }
+            gen.writeEndArray();
+
+            gen.writeArrayFieldStart("paths");
+            // To make more clean, would need to store pool as ByteBuffer (and cast to LongBuffer, etc)
+            for (int index=0; index<savePool.size(); ++index) {
+                gen.writeNumber(savePool.path(index));
+            }
+            gen.writeEndArray();
+
             gen.writeEndObject();
             gen.close();
         } catch (Exception e) {
             System.out.println(e);
         }
-
     }
 
-    private void copyNodeSubtree(NodePool srcPool, int srcIndex, NodePool dstPool) {
-        int srcNode = srcPool.node(srcIndex);
-        int dstIndex = dstPool.getFree();
-        dstPool.setNode(dstIndex, srcNode);
-        dstPool.setMaterial(dstIndex, srcPool.material(srcIndex));
-        // TODO: Path?
 
-        if (!Node.isLeaf(srcNode)) {
-            int tile = Node.child(srcNode);
-            for (int child=0; child<8; ++child) {
-                copyNodeSubtree(srcPool, tile+child, dstPool);
+    public NodePool load(String name, Attributes tags) {
+        NodePool loadPool = null;
+        int size = 0;
+
+        // TODO: Shift over to database storage
+
+        JsonFactory jsonFactory = new JsonFactory();
+        try {
+            FileInputStream input = new FileInputStream("bricks" + File.separator + name + ".node");
+
+            JsonParser parse = jsonFactory.createJsonParser(input);
+
+            if (parse.nextToken() != JsonToken.START_OBJECT) {
+                throw new Exception("File '" + name + "' must begin with a START_OBJECT");
+            }
+            while (parse.nextToken() != JsonToken.END_OBJECT) {
+                String fieldName = parse.getCurrentName();
+                parse.nextToken(); // move to value, or START_OBJECT/START_ARRAY
+
+                if ("size".equals(fieldName)) {
+                    size = parse.getIntValue();
+                } else if (Arrays.asList("nodes", "materials", "paths").contains(fieldName)) {
+                    if (size == 0) {
+                        throw new Exception("File '" + name + "' has a zero pool size.");
+                    }
+                    if (null == loadPool) {
+                        loadPool = new NodePool(size);
+                    }
+                    if (parse.getCurrentToken() != JsonToken.START_ARRAY) {
+                        throw new Exception("File '" + name + "' " + fieldName + " must begin with a START_ARRAY");
+                    }
+                    int index=0;
+
+                    if ("nodes".equals(fieldName)) {
+                        while (parse.nextToken() != JsonToken.END_ARRAY) {
+                            loadPool.setNode(index++, parse.getIntValue());
+                        }
+                    } else if ("materials".equals(fieldName)) {
+                        while (parse.nextToken() != JsonToken.END_ARRAY) {
+                            loadPool.setMaterial(index++, parse.getLongValue());
+                        }
+                    } else if ("paths".equals(fieldName)) {
+                        while (parse.nextToken() != JsonToken.END_ARRAY) {
+                            loadPool.setPath(index++, parse.getLongValue());
+                        }
+                    }
+                } else {
+                    tags.put(new Attributes.Name(fieldName), parse.toString());
+                }
+            }
+            parse.close(); // ensure resources get clean
+
+            System.out.println(loadPool);
+            return loadPool;
+
+        } catch (Exception e) {
+            System.out.println(e);
+            return null;
+        }
+    }
+
+
+
+    private int copyTileSubtree(NodePool srcPool, int srcTileIndex, NodePool dstPool) {
+        int srcIndex = 0;
+        int dstIndex = 0;
+        int dstTileIndex = 0;
+
+        // Copy this tile across
+        for (int child=0; child<8; ++child) {
+            srcIndex = srcTileIndex + child;
+            dstIndex = dstPool.getFree();
+            if (child == 0) dstTileIndex = dstIndex;
+
+            dstPool.setNode(dstIndex, srcPool.node(srcIndex));
+            dstPool.setMaterial(dstIndex, srcPool.material(srcIndex));
+            dstPool.setPath(dstIndex, srcPool.path(srcIndex));
+        }
+
+        // Now descend through the tile
+        for (int child=0; child<8; ++child) {
+            srcIndex = srcTileIndex + child;
+
+            if (Node.isNode(srcPool.node(srcIndex))) {
+                dstIndex = dstTileIndex + child;
+
+                srcIndex = copyTileSubtree(srcPool, Node.child(srcPool.node(srcIndex)), dstPool);
+
+                dstPool.setNode( dstIndex, Node.setChild( dstPool.node(dstIndex), srcIndex));
             }
         }
+
+        return dstTileIndex;
     }
 
     private NodePool compressTree() {
@@ -664,11 +760,19 @@ public class VoxTree {
         // Allocate a just-right pool
         NodePool newPool = new NodePool(stats.numUsed);
 
-        int nodeIndex = 0;  // Start at the root
-        try {
-            copyNodeSubtree(nodePool, nodeIndex, newPool);
-        } catch (Exception e) {
-            System.out.println(e);
+        // Always a root node
+        int dstIndex = newPool.getFree();
+        int rootNode = nodePool.node(0);
+        newPool.setNode(dstIndex, rootNode);
+        newPool.setMaterial(dstIndex, nodePool.material(0));
+        newPool.setPath(dstIndex, nodePool.path(0));
+
+        if (!Node.isLeaf(rootNode)) {
+            try {
+                copyTileSubtree(nodePool, Node.child(rootNode), newPool);
+            } catch (Exception e) {
+                System.out.println(e);
+            }
         }
 
         return newPool;

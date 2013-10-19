@@ -52,8 +52,10 @@ public class BrickEditor extends Canvas implements Runnable {
 
         // Floor of black
         int value;
-        for (int x=0; x<tree.breadth(); ++x){
-            for (int y=0; y<tree.breadth(); ++y){
+//        for (int x=0; x<tree.breadth(); ++x){
+//            for (int y=0; y<tree.breadth(); ++y){
+        for (int x=0; x<2; ++x){
+            for (int y=0; y<2; ++y){
                 value = (y * tree.breadth()) + x;
                 tree.setVoxelPoint(new Point3i((x*stride)+offset, 0, (y*stride)+offset), (long) Material.setMaterial(255, 255, 255, 255-value, value, value));
             }

@@ -70,6 +70,9 @@ public class Material {
     }
 
     public static long setMaterial(java.awt.Color color, int albedo, int reflectance) {
+        if (null == color) {
+            return 0L;
+        }
         return setMaterial(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha(), albedo, reflectance);
     }
 

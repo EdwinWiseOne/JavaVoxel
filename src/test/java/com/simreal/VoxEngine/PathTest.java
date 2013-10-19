@@ -57,6 +57,9 @@ public class PathTest {
                 break;
             }
         }
+
+        // Verify ID loop
+        Assert.assertEquals(path, Path.fromID( Path.toID(path), Path.depth(path)));
     }
 
     @DataProvider(name = "fromPosition")
@@ -75,6 +78,9 @@ public class PathTest {
         int edge = 2 << depth;
         long path = Path.fromPosition(position, edge, depth);
         Assert.assertEquals(path, checkPath);
+
+        // Verify ID loop
+        Assert.assertEquals(path, Path.fromID( Path.toID(path), Path.depth(path)));
     }
 
     @DataProvider(name = "toPosition")
@@ -92,6 +98,9 @@ public class PathTest {
     public void toPositionTest(int depth, int edge, long path, Point3i checkPosition) {
         Point3i position = Path.toPosition(path, edge);
         Assert.assertEquals(position, checkPosition);
+
+        // Verify ID loop
+        Assert.assertEquals(path, Path.fromID( Path.toID(path), Path.depth(path)));
     }
 
     @Test
@@ -115,12 +124,9 @@ public class PathTest {
 
             Assert.assertEquals(path, path2);
             Assert.assertEquals(position, position2);
+
+            // Verify ID loop
+            Assert.assertEquals(path, Path.fromID( Path.toID(path), Path.depth(path)));
         }
     }
-/*
-    @Test(dataProvider = "toID")
-    public void toIDTest(long path, long ID){
-
-    }
-*/
 }
