@@ -52,6 +52,11 @@ public class Material {
         return (int)((material & MATERIAL_ALPHA_MASK) >>> MATERIAL_ALPHA_SHIFT);
     }
 
+    public static int RGBA(long material) {
+        // Implicit truncation to RGBA part
+        return (int)material;
+    }
+
     public static int albedo(long material){
         return (int)((material & MATERIAL_ALBEDO_MASK) >>> MATERIAL_ALBEDO_SHIFT);
     }

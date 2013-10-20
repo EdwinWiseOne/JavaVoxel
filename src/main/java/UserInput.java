@@ -20,18 +20,45 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 
-
+/**
+ * USER INPUT SCHEMA
+ *
+ * Ctrl-*   BrickFactory commands
+ *
+ * Alt-I    Color menu
+ * Alt-S    Save current brick
+ * Alt-L    Load into current brick
+ *
+ * Shift    Fast movement
+ *
+ * A        Move Left
+ * C        Move Down
+ * D        Move Right
+ * E        Move Up
+ * S        Move Backwards
+ * W        Move Forwards
+ *
+ * Click Left   Set Voxel to Color
+ * Click Right  Erase Voxel
+ * Mouse Move   Change Heading
+ */
 public class UserInput implements Runnable, KeyListener, MouseListener, MouseMotionListener {
 
     private static UserInput userInput;
 
+    // Core properties
     private Canvas canvas;
     private VoxTree tree;
+    private Database storage;
+
+    // Interface Robot
     private Robot robot;
 
-    private boolean running;
+    // Execution support
     private long time;
+    private boolean running;
 
+    // Viewpoint details
     private volatile double heading;
     private volatile double elevation;
     private Point3d viewPoint;
@@ -39,12 +66,12 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
     private Vector3d ltVec;
     private Vector3d upVec;
 
-    private int movement;
-
-
+    // Material (inventory) state
     private java.awt.Color selectedColor = java.awt.Color.BLACK;
     private long selectedMaterial = 0L;
 
+    // Movement state and flags
+    private int movement;
     static final int MOVE_FORWARDS      = 0x0001;
     static final int MOVE_BACKWARDS     = 0x0002;
     static final int MOVE_LEFT          = 0x0004;
@@ -53,65 +80,108 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
     static final int MOVE_DOWN          = 0x0020;
 
     static final int MOVE_FAST          = 0x1000;
-    static final int MOVE_SLOW          = 0x2000;
 
-    // Singleton, factory
-    public static UserInput getUI(Canvas canvas, VoxTree tree){
-        if (userInput == null) userInput = new UserInput(canvas, tree);
+    /**
+     * Get UI instance.
+     * Singleton Factory
+     *
+     * @param canvas    Canvas we are drawing upon
+     * @param tree      VoxTree with rendering data
+     * @return          The one instance of UserInput (constructed during the first call)
+     */
+    public static UserInput getUI(Canvas canvas, VoxTree tree, Database storage){
+        if (userInput == null) userInput = new UserInput(canvas, tree, storage);
 
         return userInput;
     }
 
-    private UserInput(Canvas canvas, VoxTree tree){
+    /**
+     * Private constructor, used by the getUI Factory.
+     *
+     * @param canvas    Canvas we are drawing upon
+     * @param tree      VoxTree with rendering data
+     * @param storage   Database backing store for load and save
+     */
+    private UserInput(Canvas canvas, VoxTree tree, Database storage){
+
+        // --------------------------------------
+        // The tree is what we are looking it, yo
+        // --------------------------------------
+        this.tree = tree;
+
+        // --------------------------------------
+        // Robot is used to capture the mouse cursor into the middle of the canvas.
+        // --------------------------------------
         try {
             robot = new Robot();
         } catch (AWTException e1) {
-            e1.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+            e1.printStackTrace();
         }
 
+        // --------------------------------------
+        // Canvas and UI listeners
+        // --------------------------------------
         this.canvas = canvas;
-        this.tree = tree;
         canvas.addKeyListener(this);
         canvas.addMouseListener(this);
         canvas.addMouseMotionListener(this);
 
+        // --------------------------------------
+        // Put our viewpoint at an auspicious position for viewing the brick.
+        // --------------------------------------
         heading = Math.toRadians(90.0);
-        elevation = 0.0;
+        elevation = Math.toRadians(-20.0);
+        int edgeLength = tree.edgeLength();
+        viewPoint = new Point3d(edgeLength / 2.0, edgeLength * 1.5, -edgeLength * 3.0);
 
-        viewPoint = new Point3d(0.0, 2.0, 0.0);
         fwVec = new Vector3d();
         ltVec = new Vector3d();
         upVec = new Vector3d();
 
-heading = 1.5306;
-elevation = -0.7138;
-viewPoint.set(30, 210, -206);
-
+        // --------------------------------------
+        // Heartbeat
+        // --------------------------------------
         time = System.currentTimeMillis();
 
+        // --------------------------------------
+        // Not running... yet
+        // --------------------------------------
         running = false;
     }
 
+    /**
+     * Implementing Runnable (for the UI thread)
+     *
+     * Control viewpoint movement on the heartbeat.
+     */
     @Override
     public void run() {
-        // TODO: Shut down thread in an orderly manner, running=false somewhere
+
+        // TODO: Shut down thread in an orderly manner, running=false somewhere. Capture shutdown signal, etc?
         running = true;
 
         while (running){
             try {
+                // --------------------------------------
+                // ~60 updates a second
+                // --------------------------------------
                 Thread.sleep(16);
 
+                // --------------------------------------
+                // Update view angle
+                // --------------------------------------
                 double cosElevation = Math.cos(elevation);
                 fwVec.set(Math.cos(heading)*cosElevation, Math.sin(elevation), Math.sin(heading)*cosElevation);
                 ltVec.cross(fwVec, new Vector3d(0, 1, 0));
                 upVec.cross(ltVec, fwVec);
 
+                // --------------------------------------
+                // Update position movement
+                // --------------------------------------
                 double speed = 1.0;
                 if ((movement & MOVE_FAST) != 0)        speed *= 10.0;
-                if ((movement & MOVE_SLOW) != 0)        speed *= 0.25;
 
                 Point3d prevPoint = new Point3d(viewPoint);
-
                 if ((movement & MOVE_FORWARDS) != 0)    viewPoint.scaleAdd(speed, fwVec, viewPoint);
                 if ((movement & MOVE_BACKWARDS) != 0)   viewPoint.scaleAdd(-speed, fwVec, viewPoint);
                 if ((movement & MOVE_LEFT) != 0)        viewPoint.scaleAdd(speed, ltVec, viewPoint);
@@ -119,18 +189,42 @@ viewPoint.set(30, 210, -206);
                 if ((movement & MOVE_UP) != 0)          viewPoint.scaleAdd(speed, upVec, viewPoint);
                 if ((movement & MOVE_DOWN) != 0)        viewPoint.scaleAdd(-speed, upVec, viewPoint);
 
+                // --------------------------------------
+                // Collision test: If the viewpoint goes into a voxel, bounce it back to where it was
+                // --------------------------------------
+                // TODO: Incorporate movement momentum, so the bounce actually bounces
                 Point3i voxPoint = new Point3i((int)viewPoint.x, (int)viewPoint.y, (int)viewPoint.z);
                 if (tree.testVoxelPoint(voxPoint) != 0L) {
                     viewPoint.set(prevPoint);
                 }
 
             } catch (InterruptedException e) {
-                e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+                e.printStackTrace();
             }
         }
     }
 
-    public synchronized void getView(int width, int height, int depth, Point3d viewPoint, Vector3d ltVec, Vector3d upVec, Vector3d fwVec, Point3d topLeft){
+    /**
+     * Copy the various viewing parameters into the provided buffers.  Synchronized so it is thread-safe.
+     *
+     * @param width     Canvas width in pixels
+     * @param height    Canvas height in pixels
+     * @param depth     Viewpoint Depth to get FOV across the width, calculated as width / tan(FOV / 2)
+     * @param viewPoint Position in space of the viewpoint.
+     * @param ltVec     Unit vector pointing left from the viewpoint
+     * @param upVec     Unit vector pointing up from the viewpoint
+     * @param fwVec     Unit vector pointing up forwards (eyeline) from the viewpoint
+     * @param topLeft   Position of top-left corner of the canvas in world coordinates
+     */
+    public synchronized void getView(
+            int width,
+            int height,
+            int depth,
+            Point3d viewPoint,
+            Vector3d ltVec,
+            Vector3d upVec,
+            Vector3d fwVec,
+            Point3d topLeft){
 
         viewPoint.set(this.viewPoint);
         fwVec.set(this.fwVec);
@@ -142,48 +236,50 @@ viewPoint.set(30, 210, -206);
 
         topLeft.scaleAdd(width >> 1, ltVec, center);
         topLeft.scaleAdd(height >> 1, upVec, topLeft);
-
-        /*
-        System.out.println("=============================");
-        System.out.println("viewPoint " + viewPoint);
-        System.out.println("heading " + ((int)Math.toDegrees(heading)));
-        System.out.println("elevation " + ((int)Math.toDegrees(elevation)));
-
-        System.out.println("fwVec " + fwVec);
-        System.out.println("ltVec " + ltVec);
-        System.out.println("upVec " + upVec);
-
-        System.out.println("center " + center);
-        System.out.println("topLeft " + topLeft);
-        */
     }
 
 
+    /**
+     *  Process the key-down event.  Held keys are used for movement, and key down is also
+     *  used to trigger keys (rather than the somewhat iffier to use keyTyped event)
+     *
+     * The result of this method is to change the state of the system in some way.
+     *
+     * @param key   Key event to process
+     */
+    public void keyPressed(KeyEvent key){
+        if (key.isControlDown()) {
 
-    public void keyPressed(KeyEvent e){
-        //System.out.println("Pressed " + e.getKeyCode() + ", " + e.getKeyChar());
-        if (e.isControlDown()) {
-            switch (e.getKeyCode()) {
+            // --------------------------------------
+            // Control key events go to the brick factory
+            // --------------------------------------
+            switch (key.getKeyCode()) {
                 default:
-                    BrickFactory.keyPressed(e, tree);
+                    BrickFactory.keyPressed(key, tree);
                     break;
             }
-        } else if (e.isAltDown()) {
+        } else if (key.isAltDown()) {
             Database db;
 
-            switch (e.getKeyCode()) {
+            // --------------------------------------
+            // Alt keys (triggering commands)
+            // --------------------------------------
+            switch (key.getKeyCode()) {
+                // Inventory - just the material color at this point, with preset albedo and reflectance
                 case KeyEvent.VK_I:
                     JFrame guiFrame = new JFrame();
                     selectedColor = JColorChooser.showDialog(guiFrame, "Pick a Material", selectedColor);
                     selectedMaterial = Material.setMaterial(selectedColor, 128, 32);
                     break;
+
+                // Save the current brick
                 case KeyEvent.VK_S:
-//                    BrickFactory.save(tree);
                     db = new Database();
                     db.putBrick("test", tree.nodePool().compress());
                     break;
+
+                // Load into the current brick
                 case KeyEvent.VK_L:
-//                    BrickFactory.load(tree);
                     db = new Database();
                     NodePool loadPool = db.getBrick("test");
                     tree.setPool(loadPool);
@@ -191,7 +287,10 @@ viewPoint.set(30, 210, -206);
             }
 
         } else {
-            switch (e.getKeyCode()) {
+            // --------------------------------------
+            // Movement Keys (held)
+            // --------------------------------------
+            switch (key.getKeyCode()) {
                 case KeyEvent.VK_W:
                     movement |= MOVE_FORWARDS;
                     movement &= ~MOVE_BACKWARDS;
@@ -219,21 +318,32 @@ viewPoint.set(30, 210, -206);
                 case KeyEvent.VK_SHIFT:
                     movement |= MOVE_FAST;
                     break;
-                case KeyEvent.VK_CONTROL:
-                    movement |= MOVE_SLOW;
-                    break;
             }
         }
     }
 
+    /**
+     * Process the key-up event, used to disable any held action flags
+     *
+     * @param key
+     */
+    public void keyReleased(KeyEvent key){
+        if (key.isControlDown()) {
+            // --------------------------------------
+            // No held keys to release for Control keys
+            // --------------------------------------
 
-    public void keyReleased(KeyEvent e){
-        //System.out.println("Released " + e.getKeyCode());
-        if (e.isControlDown()) {
-        } else if (e.isAltDown()) {
+        } else if (key.isAltDown()) {
+            // --------------------------------------
+            // No held keys to release for Alt keys
+            // --------------------------------------
 
         } else {
-            switch (e.getKeyCode()) {
+
+            // --------------------------------------
+            // Release movement keys
+            // --------------------------------------
+            switch (key.getKeyCode()) {
                 case KeyEvent.VK_W:
                     movement &= ~MOVE_FORWARDS;
                     break;
@@ -254,9 +364,6 @@ viewPoint.set(30, 210, -206);
                     break;
                 case KeyEvent.VK_SHIFT:
                     movement &= ~MOVE_FAST;
-                    break;
-                case KeyEvent.VK_CONTROL:
-                    movement &= ~MOVE_SLOW;
                     break;
             }
         }
@@ -281,12 +388,29 @@ viewPoint.set(30, 210, -206);
 
     }
 
-    public void mouseClicked(MouseEvent e){
+    /**
+     * Process a mouse click (any of the various buttons), acting upon the VoxTree model element in view.
+     *
+     * @param mouse     Mouse click event to process
+     */
+    public void mouseClicked(MouseEvent mouse){
+
+        // --------------------------------------
+        // Get the path to the current highlighted node; if zero, nothing is in range so exit
+        // The Path holds the information about not only this node, but all parents to it, as
+        // well as encoding the position of the voxel in world space.
+        // --------------------------------------
         long path = tree.pickNodePath;
-        if (e.getButton() == MouseEvent.BUTTON3){
-            tree.setVoxelPath(path, 0);
-        } else if (e.getButton() == MouseEvent.BUTTON1){
+        if (path == 0L) return;
+
+        if (mouse.getButton() == MouseEvent.BUTTON1){
+            // --------------------------------------
+            // Left Button is for creating...
+            // --------------------------------------
+
+            // Get the world position that corresponds to this path...
             Point3i center = Path.toPosition(tree.pickNodePath, tree.edgeLength());
+            // ... and offset from the node in the direction of the selected facet of that node
             switch (tree.pickFacet) {
                 case VoxTree.XY_PLANE:
                     center.add(new Point3i(0, 0, -(int)Math.copySign(tree.stride(), tree.pickRay.z)));
@@ -298,29 +422,59 @@ viewPoint.set(30, 210, -206);
                     center.add(new Point3i(0, -(int)Math.copySign(tree.stride(), tree.pickRay.y), 0));
                     break;
             }
+
+            // Now create a new leaf voxel in the empty space adjacent to that selected voxel facet
             tree.setVoxelPoint(center, selectedMaterial);
+
+        } else if (mouse.getButton() == MouseEvent.BUTTON3){
+            // --------------------------------------
+            // Right button is destructing...
+            // --------------------------------------
+
+            // Set the selected voxel to zero, which eliminates it (empty space)
+            tree.setVoxelPath(path, 0);
         }
+
     }
 
     public void mouseDragged(MouseEvent e){
 
     }
 
-    public void mouseMoved(MouseEvent e){
-        // Canvas width/height may be different than the calculateView width/height (bitmap scaling)
-        int cx = canvas.getWidth() / 2;
-        int cy = canvas.getHeight() / 2;
+    /**
+     * Process a mouse motion, which changes the view angle
+     *
+     * @param mouse     Mouse motion event to process
+     */
+    public void mouseMoved(MouseEvent mouse){
 
+        // --------------------------------------
+        // Mouse events are relative to the canvas size.  Note that the canvas width and height may be
+        // different from the view width/height to allow for bit scaling, so we may calculate fewer pixels
+        // than we are displaying.
+        // --------------------------------------
+        int cx = canvas.getWidth() >> 1;
+        int cy = canvas.getHeight() >> 1;
+
+        // --------------------------------------
+        // Mouse motion from canvas center
+        // --------------------------------------
         double dx, dy;
-        dx = cx - e.getX();
-        dy = e.getY() - cy;
+        dx = cx - mouse.getX();
+        dy = mouse.getY() - cy;
 
+        // --------------------------------------
+        // Constrain and scale the motion
+        // --------------------------------------
         int mouseClip = 30;
         double mouseScale = 0.05;
 
         if (Math.abs(dx) > mouseClip) dx = (mouseClip * Math.signum(dx));
         if (Math.abs(dy) > mouseClip) dy = (mouseClip * Math.signum(dy));
 
+        // --------------------------------------
+        // Update the heading and elevation
+        // --------------------------------------
         if ( (dx != 0) || (dy != 0) ){
             double twopi = Math.PI * 2.0;
 
@@ -336,8 +490,10 @@ viewPoint.set(30, 210, -206);
             }
         }
 
+        // --------------------------------------
+        // Capture and lock the mouse to the center of the canvas
+        // --------------------------------------
         Point topLeft = canvas.getLocationOnScreen();
         robot.mouseMove(cx + topLeft.x, cy + topLeft.y);
     }
-
 }

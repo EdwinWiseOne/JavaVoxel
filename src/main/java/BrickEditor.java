@@ -1,3 +1,4 @@
+import com.simreal.VoxEngine.Database;
 import com.simreal.VoxEngine.Material;
 import com.simreal.VoxEngine.VoxTree;
 
@@ -11,157 +12,265 @@ import java.awt.image.BufferStrategy;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 
-// TODO: Clone BrickEditor, add Load and Save, and make it into a Brick Editor
-// TODO: Load bricks from a brick file, and render them at the end of the path (separate pathing for bricks)
 public class BrickEditor extends Canvas implements Runnable {
-    /**
-     *
-     */
-    private static final long serialVersionUID = 1L;
 
+    // TODO: Relevant constants in a configuration file / object
+    // --------------------------------------
+    // View definition, controlling the pixels that get calculated (versus rendered)
+    // --------------------------------------
     public static final int WIDTH = 320;
-    public static final int VIEW_WIDTH = WIDTH*3;
     public static final int HEIGHT = 240;
-    public static final int VIEW_HEIGHT = HEIGHT*3;
-
-    public static final int TREE_DEPTH = 4;
-
     private static final double H_FOV = Math.PI / 3.0;  // 60 degrees
     private static final int DEPTH = (int)(WIDTH / Math.tan(H_FOV * 0.5));
-    private static final double spread = Math.sin(H_FOV / 2.0);
-
+    // ... the backing store for the pixels calculated
     private static final int imageType = BufferedImage.TYPE_INT_RGB;
-
-    public static final String TITLE = "Title";
-
-    private boolean running = false;
     private BufferedImage img;
-    UserInput ui;
 
+    // --------------------------------------
+    // Canvas definition, the pixels that get rendered
+    // --------------------------------------
+    public static final int CANVAS_WIDTH = WIDTH*3;
+    public static final int CANVAS_HEIGHT = HEIGHT*3;
+
+    // --------------------------------------
+    // Viewpoint  TODO: better names
+    // --------------------------------------
+    private static Point3d viewPoint;
+    private static Vector3d ltVec;
+    private static Vector3d upVec;
+    private static Vector3d fwVec;
+    private static Point3d topLeft;
+
+    // --------------------------------------
+    // Raycasting  TODO: better names
+    // --------------------------------------
+    private static Point3d column0;
+    private static Point3d at;
+    private static Vector3d facing;
+
+    // --------------------------------------
+    // Tree definition.  4 levels gives 16 voxels on an edge, for the standard brick
+    // --------------------------------------
+    public static final int TREE_DEPTH = 4;
+
+    // --------------------------------------
+    // Window and Interface definition
+    // --------------------------------------
+    public static final String TITLE = "Title";
+    private UserInput uiListeners;
+
+    // --------------------------------------
+    // Brick data -- backing store and current brick tree
+    // --------------------------------------
+    private Database database;
     private VoxTree tree;
-    private int activeNode;
 
-    public BrickEditor(){
+    // --------------------------------------
+    // Misc
+    // --------------------------------------
+    private boolean running = false;
+
+    /**
+     * Constructor, set it all up.
+     */
+    public BrickEditor() {
+        // --------------------------------------
+        // Viewpoint backing data
+        // --------------------------------------
+        viewPoint = new Point3d();
+        ltVec = new Vector3d();
+        upVec = new Vector3d();
+        fwVec = new Vector3d();
+        topLeft = new Point3d();
+
+        // --------------------------------------
+        // Raycasting backing data
+        // --------------------------------------
+        column0 = new Point3d(topLeft);
+        at = new Point3d();
+        facing = new Vector3d();
+
+        // --------------------------------------
+        // Image (pixel) buffer we render into
+        // --------------------------------------
         img = new BufferedImage(WIDTH, HEIGHT, imageType);
 
-        activeNode = 0;
-        tree = new VoxTree(TREE_DEPTH);
+        // --------------------------------------
+        // Database where the voxel data lives
+        // --------------------------------------
+        database = new Database();
 
+        // --------------------------------------
+        // Voxel tree that holds the current subset of voxel data
+        // --------------------------------------
+        tree = new VoxTree(TREE_DEPTH);
         int stride = tree.stride();
         int offset = stride >> 1;
 
-        // Floor of black
-        int value;
-//        for (int x=0; x<tree.breadth(); ++x){
-//            for (int y=0; y<tree.breadth(); ++y){
-        for (int x=0; x<2; ++x){
-            for (int y=0; y<2; ++y){
-                value = (y * tree.breadth()) + x;
-                tree.setVoxelPoint(new Point3i((x*stride)+offset, 0, (y*stride)+offset), (long) Material.setMaterial(255, 255, 255, 255-value, value, value));
+        // --------------------------------------
+        // Black floor of the brick, a non-useful default model placeholder
+        // --------------------------------------
+        for (int x=0; x<tree.breadth(); ++x){
+            for (int y=0; y<tree.breadth(); ++y){
+                tree.setVoxelPoint(
+                        new Point3i((x*stride)+offset,
+                                0,
+                                (y*stride)+offset),
+                                Material.setMaterial(0, 0, 0, 255, 128, 64));
             }
         }
-
-        System.out.println("Spread: " + spread);
-//        System.out.println(tree);
-
     }
 
-    private void start() {
-        Thread thread;
-
-        // TODO: Shut down thread in an orderly manner, running=false somewhere
+    /**
+     * UI Thread Start
+     */
+    private void startUI() {
         if(running)
             return;
         running = true;
-        thread = new Thread(this);
+
+        Thread thread = new Thread(this, "UI");
         thread.start();
 
-        ui = UserInput.getUI(this, tree);
-        (new Thread(ui)).start();
+        uiListeners = UserInput.getUI(this, tree, database);
+
+        (new Thread(uiListeners)).start();
     }
 
 
+    /**
+     * Implements Runnable (for the rendering thread)
+     */
     @Override
     public void run() {
-        int count = 0;
-        long time = System.currentTimeMillis();
+        final int TEN_SECONDS = 10000;
 
+        int frameCount = 0;  // Performance counter
+        long baseTime = System.currentTimeMillis();
+
+        // --------------------------------------
+        // Grab the focus on startup so we don't have to click in the window
+        // --------------------------------------
         this.requestFocus();
 
+        // --------------------------------------
+        // Run forever...
+        // --------------------------------------
         while (running){
             render();
-            ++count;
-            long newTime = System.currentTimeMillis();
-            if ((newTime - time) > 10000){
-                time += 10000;
-                System.out.println("Frames/Second: " + count/10);
-                count = 0;
+
+            // --------------------------------------
+            // Performance statistics, logged every 10 seconds
+            // --------------------------------------
+            ++frameCount;
+            long currentTime = System.currentTimeMillis();
+            if ((currentTime - baseTime) > TEN_SECONDS){
+                baseTime += TEN_SECONDS;
+                System.out.println("Frames/Second: " + frameCount/10);
+                frameCount = 0;
             }
         }
     }
 
 
-
+    /**
+     * Create and render one image frame.
+     */
     public void render(){
+
         BufferStrategy bs = this.getBufferStrategy();
         if(bs == null){
             createBufferStrategy(2);
+            // Try again next pass
             return;
         }
+
         Graphics g = bs.getDrawGraphics();
 
-        g.drawImage(createImg(), 0, 0, VIEW_WIDTH, VIEW_HEIGHT, java.awt.Color.BLACK, null);
+        g.drawImage(createImg(), 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, java.awt.Color.BLACK, null);
 
         g.dispose();
+
         bs.show();
     }
 
+    /**
+     * Entry point for the brick editor.
+     * Does very little except create the BrickEditor instance and fire up the
+     * window we are rendering into.
+     *
+     * @param args
+     */
     public static void main(String[] args) {
-        BrickEditor rc = new BrickEditor();
+
+        BrickEditor editor = new BrickEditor();
+
         JFrame frame = new JFrame();
-        frame.add(rc);
-        frame.pack();
+
+        // Add the editor as the sole component of the Frame
+        frame.add(editor);
+
+        // Various attributes
         frame.setTitle(TITLE);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(VIEW_WIDTH, VIEW_HEIGHT);
+        frame.setSize(CANVAS_WIDTH, CANVAS_HEIGHT);
         frame.setLocationRelativeTo(null);
         frame.setResizable(false);
         frame.setVisible(true);
 
-        rc.start();
+        // Manage the layout
+        frame.pack();
+
+        // Fire it up!
+        editor.startUI();
     }
 
+    /**
+     * Raycast into the VoxTree to generate a pixel image that represents what
+     * we see from this specific viewpoint.
+     *
+     * TODO: Lighting model, etc
+     *
+     * @return  BufferedImage object suitable for framing.  Or rendering to the canvas.
+     */
     public BufferedImage createImg(){
+
+        // --------------------------------------
+        // Get the backing pixels
+        // --------------------------------------
         int[] pixels = ((DataBufferInt)img.getRaster().getDataBuffer()).getData();
 
-        int x;
+        // --------------------------------------
+        // Only get the viewpoint from the UI manager if it has already been allocated
+        // (race condition)
+        // --------------------------------------
+        if (uiListeners != null) uiListeners.getView(WIDTH, HEIGHT, DEPTH, viewPoint, ltVec, upVec, fwVec, topLeft);
 
-        Point3d viewPoint = new Point3d();
-        Vector3d ltVec = new Vector3d();
-        Vector3d upVec = new Vector3d();
-        Vector3d fwVec = new Vector3d();
-        Point3d topLeft = new Point3d();
-
-        if (ui != null) ui.getView(WIDTH, HEIGHT, DEPTH, viewPoint, ltVec, upVec, fwVec, topLeft);
-
-        Point3d column0 = new Point3d(topLeft);
-        Point3d at = new Point3d();
-        Vector3d facing = new Vector3d();
-
+        // --------------------------------------
+        // Picking ray in the center of the canvas
+        // --------------------------------------
         tree.castRay(viewPoint, fwVec, true);
 
+        // --------------------------------------
+        // Scan the entire view canvas and cast a ray from the viewpoint through each canvas point
+        // to determine that pixel's color
+        // --------------------------------------
+        int x;
+        column0.set(topLeft);
         for(int i = 0; i < pixels.length;i++){
-            x = i % WIDTH;
+            x = i % WIDTH;  // Wrap X ordinate; just used as a counter
             if (x == 0){
                 at.set(column0);
-                column0.sub(upVec);
+                column0.sub(upVec); // Advance Y position
             }
 
+            // Ray from viewPoint to pixel position
             facing.sub(at, viewPoint);
             facing.normalize();
-            pixels[i] = (int)tree.castRay(viewPoint, facing, false);
 
-            at.sub(ltVec);
+            pixels[i] = tree.castRay(viewPoint, facing, false);
+
+            at.sub(ltVec);  // Advance X position
         }
 
         return img;

@@ -23,6 +23,11 @@ public class Database {
     HTable worldTable = null;
 
     public Database() {
+        // TODO: Run database connection in a background thread
+        // TODO: Determine if database is alive before doing the heavyweight startup?
+        // TODO: Early exit for dead database?
+
+
         Configuration conf = HBaseConfiguration.create();
         conf.set("hbase.zookeeper.quorum", "localhost");
         try {
