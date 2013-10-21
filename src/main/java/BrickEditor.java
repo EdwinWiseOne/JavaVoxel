@@ -18,18 +18,25 @@ public class BrickEditor extends Canvas implements Runnable {
     // --------------------------------------
     // View definition, controlling the pixels that get calculated (versus rendered)
     // --------------------------------------
+    /** Rendering width for pixels being rendered */
     public static final int WIDTH = 320;
+    /** Rendered height for pixels being rendered */
     public static final int HEIGHT = 240;
-    private static final double H_FOV = Math.PI / 3.0;  // 60 degrees
+    /** Field of View, 60 degrees across the horizontal rendering */
+    private static final double H_FOV = Math.PI / 3.0;
+    /** Distance the viewing plane needs to be from the viewer to achieve the field of view */
     private static final int DEPTH = (int)(WIDTH / Math.tan(H_FOV * 0.5));
-    // ... the backing store for the pixels calculated
+    /** Backing store for the pixels */
     private static final int imageType = BufferedImage.TYPE_INT_RGB;
+    /** Image that manages the backing store */
     private BufferedImage img;
 
     // --------------------------------------
     // Canvas definition, the pixels that get rendered
     // --------------------------------------
+    /** Display canvas width */
     public static final int CANVAS_WIDTH = WIDTH*3;
+    /** Display canvas height */
     public static final int CANVAS_HEIGHT = HEIGHT*3;
 
     // --------------------------------------
@@ -51,11 +58,13 @@ public class BrickEditor extends Canvas implements Runnable {
     // --------------------------------------
     // Tree definition.  4 levels gives 16 voxels on an edge, for the standard brick
     // --------------------------------------
+    /** Tree length, which determines the maximum number of nodes in the tree and the size cube the tree can represent */
     public static final int TREE_DEPTH = 4;
 
     // --------------------------------------
     // Window and Interface definition
     // --------------------------------------
+    /** Window title */
     public static final String TITLE = "Title";
     private UserInput uiListeners;
 
@@ -71,9 +80,10 @@ public class BrickEditor extends Canvas implements Runnable {
     private boolean running = false;
 
     /**
-     * Constructor, set it all up.
+     * Constructor, set the tree up.
      */
     public BrickEditor() {
+
         // --------------------------------------
         // Viewpoint backing data
         // --------------------------------------

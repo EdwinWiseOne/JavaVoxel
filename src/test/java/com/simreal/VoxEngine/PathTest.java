@@ -40,11 +40,11 @@ public class PathTest {
             // -------------------------------------------
 
             Assert.assertEquals(Path.child(path, 0), firstChild);
-            if (depth < Path.PATH_MAX_DEPTH) {
-                Assert.assertEquals(Path.depth(path), depth);
+            if (depth < Path.PATH_MAX_LENGTH) {
+                Assert.assertEquals(Path.length(path), depth);
                 Assert.assertEquals(Path.child(path, depth-1), child & Path.PATH_CHILD_MASK);
             } else {
-                Assert.assertEquals(Path.depth(path), Path.PATH_MAX_DEPTH);
+                Assert.assertEquals(Path.length(path), Path.PATH_MAX_LENGTH);
             }
         }
 
@@ -53,13 +53,13 @@ public class PathTest {
         for (int child : children) {
             Assert.assertEquals(Path.child(path, depth), child & Path.PATH_CHILD_MASK);
             ++depth;
-            if (depth >= Path.PATH_MAX_DEPTH) {
+            if (depth >= Path.PATH_MAX_LENGTH) {
                 break;
             }
         }
 
         // Verify ID loop
-        Assert.assertEquals(path, Path.fromID( Path.toID(path), Path.depth(path)));
+        Assert.assertEquals(path, Path.fromID( Path.toID(path), Path.length(path)));
     }
 
     @DataProvider(name = "fromPosition")
@@ -80,7 +80,7 @@ public class PathTest {
         Assert.assertEquals(path, checkPath);
 
         // Verify ID loop
-        Assert.assertEquals(path, Path.fromID( Path.toID(path), Path.depth(path)));
+        Assert.assertEquals(path, Path.fromID( Path.toID(path), Path.length(path)));
     }
 
     @DataProvider(name = "toPosition")
@@ -100,7 +100,7 @@ public class PathTest {
         Assert.assertEquals(position, checkPosition);
 
         // Verify ID loop
-        Assert.assertEquals(path, Path.fromID( Path.toID(path), Path.depth(path)));
+        Assert.assertEquals(path, Path.fromID( Path.toID(path), Path.length(path)));
     }
 
     @Test
@@ -126,7 +126,7 @@ public class PathTest {
             Assert.assertEquals(position, position2);
 
             // Verify ID loop
-            Assert.assertEquals(path, Path.fromID( Path.toID(path), Path.depth(path)));
+            Assert.assertEquals(path, Path.fromID( Path.toID(path), Path.length(path)));
         }
     }
 }

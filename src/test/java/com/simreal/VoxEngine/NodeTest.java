@@ -21,7 +21,7 @@ public class NodeTest {
     @DataProvider(name = "leaf")
     private Object[][] createLeaf() {
         return new Object[][] {
-                // Base node, leaf, depth (guard)
+                // Base node, leaf, length (guard)
                 {0, true, 0},
                 {0, false, 0},
                 {~0, true, 15},
@@ -29,10 +29,10 @@ public class NodeTest {
         };
     }
 
-    @DataProvider(name = "depth")
+    @DataProvider(name = "length")
     private Object[][] createDepth() {
         return new Object[][] {
-                // Base node, depth
+                // Base node, length
                 {0, 0},
                 {0, 1},
                 {0, ~0},
@@ -55,7 +55,7 @@ public class NodeTest {
         Assert.assertEquals(Node.depth(node), depth);
     }
 
-    @Test(dataProvider =  "depth")
+    @Test(dataProvider =  "length")
     public void nodeDepthTest(int node, int depth) {
         node = Node.setDepth(node, (byte)depth);
         Assert.assertEquals(Node.depth(node), depth & 0x0F);

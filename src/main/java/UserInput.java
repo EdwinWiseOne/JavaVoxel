@@ -82,7 +82,7 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
     static final int MOVE_FAST          = 0x1000;
 
     /**
-     * Get UI instance.
+     * Gets the UI instance.
      * Singleton Factory
      *
      * @param canvas    Canvas we are drawing upon
@@ -168,7 +168,7 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
                 Thread.sleep(16);
 
                 // --------------------------------------
-                // Update view angle
+                // Update view curlScale
                 // --------------------------------------
                 double cosElevation = Math.cos(elevation);
                 fwVec.set(Math.cos(heading)*cosElevation, Math.sin(elevation), Math.sin(heading)*cosElevation);
@@ -205,7 +205,7 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
     }
 
     /**
-     * Copy the various viewing parameters into the provided buffers.  Synchronized so it is thread-safe.
+     * Copies the various viewing parameters into the provided buffers.  Synchronized so it is thread-safe.
      *
      * @param width     Canvas width in pixels
      * @param height    Canvas height in pixels
@@ -240,7 +240,7 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
 
 
     /**
-     *  Process the key-down event.  Held keys are used for movement, and key down is also
+     *  Processes the key-down event.  Held keys are used for movement, and key down is also
      *  used to trigger keys (rather than the somewhat iffier to use keyTyped event)
      *
      * The result of this method is to change the state of the system in some way.
@@ -442,7 +442,7 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
     }
 
     /**
-     * Process a mouse motion, which changes the view angle
+     * Process a mouse motion, which changes the view curlScale
      *
      * @param mouse     Mouse motion event to process
      */
@@ -464,7 +464,7 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
         dy = mouse.getY() - cy;
 
         // --------------------------------------
-        // Constrain and scale the motion
+        // Constrain and inputScale the motion
         // --------------------------------------
         int mouseClip = 30;
         double mouseScale = 0.05;

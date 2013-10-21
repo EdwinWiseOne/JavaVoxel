@@ -2,9 +2,9 @@ package com.simreal.VoxEngine;
 
 
 /**
- * Texture generation, based on Perlin noise, founded on SimplexNoise as implemented by:
- *      http://webstaff.itn.liu.se/~stegu/simplexnoise/SimplexNoise.java
- * ------------------------------------------------------------------
+ * Texture generation, based on Perlin noise, founded on SimplexNoise as implemented by
+ * http://webstaff.itn.liu.se/~stegu/simplexnoise/SimplexNoise.java.
+ *
  * This code was placed in the public domain by its original author,
  * Stefan Gustavson. You may use it as you see fit, but
  * attribution is appreciated.
@@ -12,50 +12,91 @@ package com.simreal.VoxEngine;
  * Based on example code by Stefan Gustavson (stegu@itn.liu.se).
  * Optimisations by Peter Eastman (peastman@drizzle.stanford.edu).
  * Better rank ordering method by Stefan Gustavson in 2012.
- * ------------------------------------------------------------------
  *
- *  Value transformations generate a value from 0..1
+ * The raw noise is in the range of (-1..+1); raw noise is only internal to the Texture process.
+ * Value transformations convert the raw noise to a value from (0..1), and this can be converted
+ * to [0..255] via the toByte function.
  */
 public class Texture {
     // --------------------------------------
     // Texture transform control flags
     // --------------------------------------
-    public static final int REFLECT = 0x01;     // fabs
-    public static final int SQUARE = 0X02;      // pow(2)
-    public static final int CURL = 0x04;        // cos, uses decay
-    public static final int BANDCLAMP = 0x08;   // band soft clamp
-    public static final int INVERT = 0x20;      // 255 - w
-    public static final int QUANT = 0x80;       // uses quantLevel
+    /** Reflect the raw noise value via Math.fabs  */
+    public static final int REFLECT     = 0x01;
+    /** Raise the raw noise value to the power of 2 */
+    public static final int SQUARE      = 0X02;
+    /** Curl the raw noise by passing it through Math.cos. Uses {@link @curlScale} to inputScale the curl. */
+    public static final int CURL        = 0x04;
+    /** Clamp the output to be near the indicated {@link #band} value */
+    public static final int BANDCLAMP   = 0x08;
+    /** Invert the output, shifting it from (0..1) to (1..0) */
+    public static final int INVERT      = 0x20;
+    /** Quantize the output, forcing it into the number of values specified by {@link @quantNum} */
+    public static final int QUANT       = 0x80;
 
     // --------------------------------------
     // Texture control parameters (defaulted)
     // --------------------------------------
-    public int transform = 0x00;    // transformation control flags
-    public double scale = 1.0;      // input scaling factor
-    public double decay = 1.0;      // Curl scaling factor; matches y or z scaling
-    public double band = 0.0;   // Clamp band
-    public int quantLevel = 0;      // Number of quantization levels
+    /** Transformation control bitflag */
+    public int transform = 0x00;
+    /** Input scaling factor, scales the resulting noise */
+    public double inputScale = 1.0;
+    /** Curl scaling factor, scaling the input to cosine.  Curl processes the Y or Z ordinate. */
+    public double curlScale = 1.0;
+    /** Value band to constrain the output to, in the range (0..1) */
+    public double band = 0.0;
+    /** Number of output values to quantize to */
+    public int quantNum = 0;
 
-
+    /**
+     * Scales the texture input w from (0..1) to [0..255]
+     *
+     * @param w     Input noise value in (0..1)
+     * @return      Byte value in [0..255]
+     */
     public static int toByte(double w) {
-        return (int)(w * 255);
+        return (int)(w * 256);
     }
 
+    /**
+     * Calculate the transformed texture value for the given position in X,Y space
+     *
+     * @param x     X ordinate in texture space (scaled by {@link #inputScale})
+     * @param y     Y ordinate in texture space (scaled by {@link #inputScale})
+     * @return      Texture value in (0..1)
+     */
     public double value(double x, double y) {
-        return xform(y, noise(x * scale, y * scale));
+        return xform(y, noise(x * inputScale, y * inputScale));
     }
 
+    /**
+     * Calculate the transformed texture value for the given position in X,Y,Z space
+     *
+     * @param x    X ordinate in texture space (scaled by {@link #inputScale})
+     * @param y    Y ordinate in texture space (scaled by {@link #inputScale})
+     * @param z    Z ordinate in texture space (scaled by {@link #inputScale})
+     * @return      Texture value in (0..1)
+     */
     public double value(double x, double y, double z) {
-        return xform(z, noise(x * scale, y * scale, z * scale));
+        return xform(z, noise(x * inputScale, y * inputScale, z * inputScale));
     }
 
-    public double xform(double y, double w) {
+    /**
+     * Apply the transforms flagged in {@link @transform} to the raw noise value in (-1..+1),
+     * returning the transformed texture value in (0..1).  Certain transformations (e.g. {@link #CURL}
+     * use a key ordinate to control the transform.
+     *
+     * @param key    Key value for certain transforms
+     * @param w      Raw noise value in (-1 .. +1)
+     * @return       Transformed noise value in (0..1)
+     */
+    public double xform(double key, double w) {
         // --------------------------------------
         // w is (-1 .. +1)
         // --------------------------------------
         if ((transform & CURL) != 0) {
-            double twist = decay * 45.0;
-            w = Math.cos(Math.toRadians(y/twist + w*twist));
+            double twist = curlScale * 45.0;
+            w = Math.cos(Math.toRadians(key/twist + w*twist));
         }
 
         if ((transform & SQUARE) != 0) {
@@ -67,10 +108,10 @@ public class Texture {
         }
 
         // --------------------------------------
-        // Covert w to the [0..1] range
+        // w to the (0..1) range now
         // --------------------------------------
         if ((transform & (REFLECT | SQUARE)) == 0) {
-            w = (w * 0.5) + 0.5;
+            w = (w + 1.0) * 0.5;
         }
 
         if ((transform & BANDCLAMP) != 0) {
@@ -79,14 +120,8 @@ public class Texture {
             w = Math.pow(t, 10);
        }
 
-       // --------------------------------------
-        // Clamp... should not be needed?
-        // --------------------------------------
-//        if (w < 0.0) { w = 0.0; }
-//        if (w > 1.0) { w = 1.0; }
-
         if ((transform & QUANT) != 0) {
-            w = (double)((int)(w * quantLevel)) / (double)quantLevel;
+            w = (double)((int)(w * quantNum)) / (double) quantNum;
         }
 
         if ((transform & INVERT) != 0) {
@@ -98,20 +133,20 @@ public class Texture {
 
     // --------------------------------------
     // Inner class to speed up gradient computations
-    // (array access is a lot slower than member access)
+    // (array access is apparently a lot slower than member access)
     // --------------------------------------
-    private static class Grad
+    private static class Gradient
     {
         double x, y, z, w;
 
-        Grad(double x, double y, double z)
+        Gradient(double x, double y, double z)
         {
             this.x = x;
             this.y = y;
             this.z = z;
         }
 
-        Grad(double x, double y, double z, double w)
+        Gradient(double x, double y, double z, double w)
         {
             this.x = x;
             this.y = y;
@@ -120,18 +155,18 @@ public class Texture {
         }
     }
 
-    private static Grad grad3[] = {new Grad(1,1,0),new Grad(-1,1,0),new Grad(1,-1,0),new Grad(-1,-1,0),
-            new Grad(1,0,1),new Grad(-1,0,1),new Grad(1,0,-1),new Grad(-1,0,-1),
-            new Grad(0,1,1),new Grad(0,-1,1),new Grad(0,1,-1),new Grad(0,-1,-1)};
+    private static Gradient _gradient3[] = {new Gradient(1,1,0),new Gradient(-1,1,0),new Gradient(1,-1,0),new Gradient(-1,-1,0),
+            new Gradient(1,0,1),new Gradient(-1,0,1),new Gradient(1,0,-1),new Gradient(-1,0,-1),
+            new Gradient(0,1,1),new Gradient(0,-1,1),new Gradient(0,1,-1),new Gradient(0,-1,-1)};
 
-    private static Grad grad4[]= {new Grad(0,1,1,1),new Grad(0,1,1,-1),new Grad(0,1,-1,1),new Grad(0,1,-1,-1),
-            new Grad(0,-1,1,1),new Grad(0,-1,1,-1),new Grad(0,-1,-1,1),new Grad(0,-1,-1,-1),
-            new Grad(1,0,1,1),new Grad(1,0,1,-1),new Grad(1,0,-1,1),new Grad(1,0,-1,-1),
-            new Grad(-1,0,1,1),new Grad(-1,0,1,-1),new Grad(-1,0,-1,1),new Grad(-1,0,-1,-1),
-            new Grad(1,1,0,1),new Grad(1,1,0,-1),new Grad(1,-1,0,1),new Grad(1,-1,0,-1),
-            new Grad(-1,1,0,1),new Grad(-1,1,0,-1),new Grad(-1,-1,0,1),new Grad(-1,-1,0,-1),
-            new Grad(1,1,1,0),new Grad(1,1,-1,0),new Grad(1,-1,1,0),new Grad(1,-1,-1,0),
-            new Grad(-1,1,1,0),new Grad(-1,1,-1,0),new Grad(-1,-1,1,0),new Grad(-1,-1,-1,0)};
+    private static Gradient _gradient4[]= {new Gradient(0,1,1,1),new Gradient(0,1,1,-1),new Gradient(0,1,-1,1),new Gradient(0,1,-1,-1),
+            new Gradient(0,-1,1,1),new Gradient(0,-1,1,-1),new Gradient(0,-1,-1,1),new Gradient(0,-1,-1,-1),
+            new Gradient(1,0,1,1),new Gradient(1,0,1,-1),new Gradient(1,0,-1,1),new Gradient(1,0,-1,-1),
+            new Gradient(-1,0,1,1),new Gradient(-1,0,1,-1),new Gradient(-1,0,-1,1),new Gradient(-1,0,-1,-1),
+            new Gradient(1,1,0,1),new Gradient(1,1,0,-1),new Gradient(1,-1,0,1),new Gradient(1,-1,0,-1),
+            new Gradient(-1,1,0,1),new Gradient(-1,1,0,-1),new Gradient(-1,-1,0,1),new Gradient(-1,-1,0,-1),
+            new Gradient(1,1,1,0),new Gradient(1,1,-1,0),new Gradient(1,-1,1,0),new Gradient(1,-1,-1,0),
+            new Gradient(-1,1,1,0),new Gradient(-1,1,-1,0),new Gradient(-1,-1,1,0),new Gradient(-1,-1,-1,0)};
 
     // --------------------------------------
     // Permutation arrays
@@ -172,17 +207,51 @@ public class Texture {
     // --------------------------------------
     // High-speed math functions
     // --------------------------------------
+
+    /**
+     * Finds the gives the largest integer that is less than or equal to the argument.
+     *
+     * @param x     Double value
+     * @return      Integer that is less than x
+     */
     private static int fastfloor(double x) {
         int xi = (int)x;
         return x<xi ? xi-1 : xi;
     }
 
-    private static double dot(Grad g, double x, double y) {
-        return g.x*x + g.y*y; }
+    /**
+     * Calculates 2 dimensional dot product of a gradient by x,y returning the cosine
+     * of the angle between the vectors times the length of the vectors.
+     *
+     * @param g     Gradient, with x,y significant
+     * @param x     X ordinate of second vector
+     * @param y     Y ordinate of the second vector
+     * @return      Result of g dot (x,y)
+     */
+    private static double dot(Gradient g, double x, double y) {
+        return g.x*x + g.y*y;
+    }
 
-    private static double dot(Grad g, double x, double y, double z) {
-        return g.x*x + g.y*y + g.z*z; }
+    /**
+     * Calculates 3 dimensional dot product of a gradient by x,y,z returning the cosine
+     * of the angle between the vectors times the length of the vectors.
+     *
+     * @param g     Gradient, with x,y,z significant
+     * @param x     X ordinate of second vector
+     * @param y     Y ordinate of the second vector
+     * @param z     Z ordinate of the second vector
+     * @return      Result of g dot (x,y,z)
+     */
+    private static double dot(Gradient g, double x, double y, double z) {
+        return g.x*x + g.y*y + g.z*z;
+    }
 
+    /**
+     * Calculate the absolute value of the argument.
+     *
+     * @param x     Signed double value
+     * @return      Unsigned double result
+     */
     private static double fastfabs(double x) {
         return (x < 0) ? -x : x;
     }
@@ -190,11 +259,11 @@ public class Texture {
     /**
      * 2D simplex noise
      *
-     * @param xin
-     * @param yin
-     * @return Noise value in the range [-1, 1]
+     * @param xin   X ordinate in noise space
+     * @param yin   Y ordinate in noise space
+     * @return      Noise value in the range (-1, 1)
      */
-    private static double noise(double xin, double yin) {
+    public static double noise(double xin, double yin) {
         double n0, n1, n2; // Noise contributions from the three corners
         // Skew the input space to determine which simplex cell we're in
         double s = (xin+yin)*F2; // Hairy factor for 2D
@@ -228,19 +297,19 @@ public class Texture {
         if(t0<0) n0 = 0.0;
         else {
             t0 *= t0;
-            n0 = t0 * t0 * dot(grad3[gi0], x0, y0);  // (x,y) of grad3 used for 2D gradient
+            n0 = t0 * t0 * dot(_gradient3[gi0], x0, y0);  // (x,y) of _gradient3 used for 2D gradient
         }
         double t1 = 0.5 - x1*x1-y1*y1;
         if(t1<0) n1 = 0.0;
         else {
             t1 *= t1;
-            n1 = t1 * t1 * dot(grad3[gi1], x1, y1);
+            n1 = t1 * t1 * dot(_gradient3[gi1], x1, y1);
         }
         double t2 = 0.5 - x2*x2-y2*y2;
         if(t2<0) n2 = 0.0;
         else {
             t2 *= t2;
-            n2 = t2 * t2 * dot(grad3[gi2], x2, y2);
+            n2 = t2 * t2 * dot(_gradient3[gi2], x2, y2);
         }
         // Add contributions from each corner to get the final noise value.
         // The result is scaled to return values in the interval [-1,1].
@@ -251,10 +320,10 @@ public class Texture {
     /**
      * 3D simplex noise
      *
-     * @param xin
-     * @param yin
-     * @param zin
-     * @return Noise value in the range (-1, 1)
+     * @param xin   X ordinate in noise space
+     * @param yin   Y ordinate in noise space
+     * @param zin   Z ordinate in noise space
+     * @return      Noise value in the range (-1, 1)
      */
     private static double noise(double xin, double yin, double zin) {
         double n0, n1, n2, n3; // Noise contributions from the four corners
@@ -311,25 +380,25 @@ public class Texture {
         if(t0<0) n0 = 0.0;
         else {
             t0 *= t0;
-            n0 = t0 * t0 * dot(grad3[gi0], x0, y0, z0);
+            n0 = t0 * t0 * dot(_gradient3[gi0], x0, y0, z0);
         }
         double t1 = 0.6 - x1*x1 - y1*y1 - z1*z1;
         if(t1<0) n1 = 0.0;
         else {
             t1 *= t1;
-            n1 = t1 * t1 * dot(grad3[gi1], x1, y1, z1);
+            n1 = t1 * t1 * dot(_gradient3[gi1], x1, y1, z1);
         }
         double t2 = 0.6 - x2*x2 - y2*y2 - z2*z2;
         if(t2<0) n2 = 0.0;
         else {
             t2 *= t2;
-            n2 = t2 * t2 * dot(grad3[gi2], x2, y2, z2);
+            n2 = t2 * t2 * dot(_gradient3[gi2], x2, y2, z2);
         }
         double t3 = 0.6 - x3*x3 - y3*y3 - z3*z3;
         if(t3<0) n3 = 0.0;
         else {
             t3 *= t3;
-            n3 = t3 * t3 * dot(grad3[gi3], x3, y3, z3);
+            n3 = t3 * t3 * dot(_gradient3[gi3], x3, y3, z3);
         }
         // Add contributions from each corner to get the final noise value.
         // The result is scaled to stay just inside [-1,1]

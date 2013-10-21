@@ -1,24 +1,14 @@
 package com.simreal.VoxEngine;
 
 import com.simreal.VoxEngine.brick.BrickFactory;
-import org.codehaus.jackson.JsonEncoding;
-import org.codehaus.jackson.JsonFactory;
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.JsonToken;
 
 import javax.vecmath.Point3d;
 import javax.vecmath.Point3i;
 import javax.vecmath.Vector3d;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.util.Arrays;
 import java.util.Random;
-import java.util.jar.Attributes;
 
 /**
- * The VoxTree manages the efficient traversal of the voxel tree structure, interpreting
+ * VoxTree (Voxel Octal Tree) manages the efficient traversal of the voxel tree structure, interpreting
  * the tree implied by the node data in the NodePool.
  *
  * The NodePool associated with the tree holds the actual data that makes up the tree,
@@ -29,13 +19,22 @@ public class VoxTree {
      * Raycasting State used to traverse the voxel oct tree
      */
     class State {
-        public Point3d t0;      // Near crossing (distance along ray)
-        public Point3d t1;      // Far crossing
-        public Point3d tM;      // Midpoint
-        public long nodePath;   // Path to this point
-        public int nodeIndex;   // Current node's index
-        public int octant;      // Descent choice
+        /** Near crossing, distance along the ray */
+        public Point3d t0;
+        /** Far crossing, distance along the ray */
+        public Point3d t1;
+        /** Midpoint of t0 and t1 */
+        public Point3d tM;
+        /** Path so far, to this state */
+        public long nodePath;
+        /** {@link NodePool} index for the node at this state/path */
+        public int nodeIndex;
+        /** Child octant this state represents (path choice) */
+        public int octant;
 
+        /**
+         * Construct a blank state object
+         */
         State(){
             t0 = new Point3d();
             t1 = new Point3d();
@@ -45,6 +44,11 @@ public class VoxTree {
             octant = 0;
         }
 
+        /**
+         * Clone state settings
+         *
+         * @param state     State to clone
+         */
         public void set(State state){
             this.t0.set(state.t0);
             this.t1.set(state.t1);
@@ -113,7 +117,7 @@ public class VoxTree {
     static final long startTime = System.currentTimeMillis();
 
     /**
-     * Construct a tree of the given depth.
+     * Construct a tree of the given length.
      *
      * @param depth Number of levels in the tree
      */
@@ -248,7 +252,7 @@ public class VoxTree {
     /**
      * Given a path through the tree, set the indicated voxel
      * to the given material.  Path SHOULD have the same length
-     * as the tree depth, but if it doesn't we end up setting
+     * as the tree length, but if it doesn't we end up setting
      * a non-leaf voxel (covering a number of the lowest level voxels)
      *
      * @param path          Path to a voxel
@@ -327,7 +331,7 @@ public class VoxTree {
      */
     private int splitVoxel(int nodeIndex) {
         // --------------------------------------
-        // Clone the parent node for the children, updating the depth
+        // Clone the parent node for the children, updating the length
         // --------------------------------------
         int node = nodePool.node(nodeIndex);
         int childNode = Node.setDepth(node, (byte)(Node.depth(node)+1));
@@ -366,14 +370,14 @@ public class VoxTree {
      */
     public void refineVoxelPath(long path) {
         boolean merge = true;
-        int depth = Path.depth(path);
+        int depth = Path.length(path);
 
         // --------------------------------------
         // Traverse the path from bottom to top, merging until we
         // don't have a merge
         // --------------------------------------
         for (int level=depth-1; level >= 0; --level) {
-            path = Path.setDepth(path, level);
+            path = Path.setLength(path, level);
             merge &= refineVoxel(path, merge);
         }
     }
@@ -464,7 +468,7 @@ public class VoxTree {
     public int getIndexForPath(long path, boolean split) {
         int node;
         int nodeIndex = 0;
-        int depth = Path.depth(path);
+        int depth = Path.length(path);
 
         // --------------------------------------
         // Walk down the path...
@@ -499,7 +503,7 @@ public class VoxTree {
      * the color along the path is fully defined.
      *
      * Picking returns color, but also sets the internal details of the picked voxel
-     * for access later.  See @pickNodePath, @pickNodeIndex, @pickFacet, and @pickRay
+     * for access later.  See {@link pickNodePath}, {@link pickNodeIndex}, {@link pickFacet}, and {@link pickRay}
      *
      * @param inOrigin  Viewpoint origin in the world
      * @param inRay     Normalized ray to traverse
@@ -601,6 +605,8 @@ public class VoxTree {
      * Do the heavy lifting on the ray casting. Instead of recursion down the voxel oct tree, keeps the
      * state on an explicit stack and iterates down the tree.
      *
+     * Based tightly on the work of GigaVoxels:  http://maverick.inria.fr/Publications/2009/CNLE09/
+     *
      * @param t0      Near crossing of the ray as it enters the tree, distance along ray
      * @param t1      Far crossing of the ray as it exits the tree, distance along ray
      * @param view    View vector, used for lighting the voxels caught in the ray
@@ -610,22 +616,22 @@ public class VoxTree {
     private long castSubtree(Point3d t0, Point3d t1, Vector3d view, boolean pick){
 
         // Working variables
-        Point3d tM1 = new Point3d();
-        Point3i tOct = new Point3i();
-        long material = 0L;
+        Point3d tM1 = new Point3d();    // Midpoint of t0 and t1
+        Point3i tOct = new Point3i();   // Holds the index of the NEXT octant after this one
+        long material = 0L;             // Material accumulator
 
         // --------------------------------------
         // Setup the initial state
         // --------------------------------------
         tM1.add(t0, t1);
         tM1.scale(0.5);
-        int octant = findOctant(t0, tM1);
+        int octant = findOctant(t0, tM1);   // Which sub-node is the entry point into this node
+        state.octant = octant;
         state.t0 = t0;
         state.t1 = t1;
         state.tM = tM1;
         state.nodePath = 0L;
         state.nodeIndex = 0;
-        state.octant = octant;
 
         int stateStackTop = 0;
         stateStack[stateStackTop++].set(state);
@@ -636,7 +642,7 @@ public class VoxTree {
         while (stateStackTop > 0){
 
             // --------------------------------------
-            // Get the top state and node from the stack
+            // Get the top state from the stack and its node
             // --------------------------------------
             state.set(stateStack[--stateStackTop]);
             int node = nodePool.node(state.nodeIndex);
@@ -713,7 +719,7 @@ public class VoxTree {
                                 normal.set(0.0, 0.0, 1.0);
                                 break;
                         }
-                        // Undo mirroring
+                        // Undo mirroring for the surface normal
                         if ((facet & mirror) > 0)
                             normal.scale(-1);
 
@@ -735,7 +741,10 @@ public class VoxTree {
                 // --------------------------------------
                 // Hit a node, so descend to the appropriate child
                 // --------------------------------------
+                // Remember where we started as we travel farther
                 int thisOctant = state.octant;
+                // Subdivide to a new state for the child at the start of the ray
+                // and log the options for which child is next
                 switch (state.octant){
                     case 0:
                         newState.t0.set(state.t0);
@@ -779,27 +788,29 @@ public class VoxTree {
                         break;
                 }
 
-                // Traverse...
+                // Traverse... determine the sibling node based on the exit path of the ray
+                // and push it to the state stack... used when we pop back up the tree
                 state.octant = nextOctant(newState.t1, tOct);
                 if (state.octant < 8) {
                     stateStack[stateStackTop++].set(state);
                 }
 
-                // ... descend
+                // Descend... find the child node at the start of the ray and
+                // set up a new state to capture it
                 newState.tM.add(newState.t0, newState.t1);
                 newState.tM.scale(0.5);
                 octant = findOctant(newState.t0, newState.tM);
                 newState.octant = octant;
-
-                int octantMirror = thisOctant ^ mirror;
-                newState.nodeIndex = Node.child(node) + octantMirror;
-                newState.nodePath = Path.addChild(state.nodePath, octantMirror);
+                int octantUnMirrored = thisOctant ^ mirror;
+                newState.nodeIndex = Node.child(node) + octantUnMirrored;
+                newState.nodePath = Path.addChild(state.nodePath, octantUnMirrored);
                 if (stateStackTop > depth) {
                     System.out.println("STATE STACK OVERFLOW");
                     return material;
                 }
 
-                // ... record
+                // ... push the descent state, which will be popped at the top
+                // of the loop
                 stateStack[stateStackTop++].set(newState);
             }
         }
@@ -809,10 +820,12 @@ public class VoxTree {
     }
 
     /**
+     * Determine the entry voxel from the entry plane (from t0)
+     * and the placement of the midpoint (tM)
      *
-     * @param t0
-     * @param tM
-     * @return
+     * @param t0    Near distance along ray intersecting the cube
+     * @param tM    Midpoint of t0 (near) and t1 (far)
+     * @return      The child number of the entry voxel
      */
     private int findOctant(Point3d t0, Point3d tM){
         int octant = 0;
@@ -844,7 +857,12 @@ public class VoxTree {
     }
 
     /**
+     * Determine the next voxel in sequence given the exit plane (t1)
+     * and the list of possible exit voxels
      *
+     * @param t1        Near distance along ray intersecting the cube
+     * @param octant    List of exit voxels by exit plane
+     * @return          The child number of the exit voxel
      */
     private int nextOctant(Point3d t1, Point3i octant){
         if (t1.x < t1.y){
@@ -863,182 +881,11 @@ public class VoxTree {
         return octant.z;  // exit XY Plane
     }
 
-    // --------------------------------------
-    // Save, Load, and related utilities
-    // --------------------------------------
-
-    public void save(String name, Attributes tags) {
-        NodePool savePool = compressTree();
-
-//        System.out.println(nodePool);
-//        System.out.println(savePool);
-
-        // TODO: Shift over to database storage
-
-        // TODO: materials and paths need saving (and loading)
-
-        JsonFactory jsonFactory = new JsonFactory();
-        try {
-            FileOutputStream  output = new FileOutputStream("bricks" + File.separator + name + ".node");
-
-            JsonGenerator gen = jsonFactory.createJsonGenerator(output, JsonEncoding.UTF8); // or Stream, Reader
-
-            gen.writeStartObject();
-            gen.writeNumberField("size", savePool.size());
-            for (Object key : tags.keySet()) {
-                String keyStr = key.toString();
-                gen.writeStringField(keyStr, tags.getValue(keyStr));
-                System.out.println(keyStr + " = " + tags.getValue(keyStr));
-            }
-            gen.writeArrayFieldStart("nodes");
-            // To make more clean, would need to store pool as ByteBuffer (and cast to LongBuffer, etc)
-            for (int index=0; index<savePool.size(); ++index) {
-                gen.writeNumber(savePool.node(index));
-            }
-            gen.writeEndArray();
-
-            gen.writeArrayFieldStart("materials");
-            // To make more clean, would need to store pool as ByteBuffer (and cast to LongBuffer, etc)
-            for (int index=0; index<savePool.size(); ++index) {
-                gen.writeNumber(savePool.material(index));
-            }
-            gen.writeEndArray();
-
-            gen.writeArrayFieldStart("paths");
-            // To make more clean, would need to store pool as ByteBuffer (and cast to LongBuffer, etc)
-            for (int index=0; index<savePool.size(); ++index) {
-                gen.writeNumber(savePool.path(index));
-            }
-            gen.writeEndArray();
-
-            gen.writeEndObject();
-            gen.close();
-        } catch (Exception e) {
-            System.out.println(e);
-        }
-    }
-
-
-    public NodePool load(String name, Attributes tags) {
-        NodePool loadPool = null;
-        int size = 0;
-
-        // TODO: Shift over to database storage
-
-        JsonFactory jsonFactory = new JsonFactory();
-        try {
-            FileInputStream input = new FileInputStream("bricks" + File.separator + name + ".node");
-
-            JsonParser parse = jsonFactory.createJsonParser(input);
-
-            if (parse.nextToken() != JsonToken.START_OBJECT) {
-                throw new Exception("File '" + name + "' must begin with a START_OBJECT");
-            }
-            while (parse.nextToken() != JsonToken.END_OBJECT) {
-                String fieldName = parse.getCurrentName();
-                parse.nextToken(); // move to value, or START_OBJECT/START_ARRAY
-
-                if ("size".equals(fieldName)) {
-                    size = parse.getIntValue();
-                } else if (Arrays.asList("nodes", "materials", "paths").contains(fieldName)) {
-                    if (size == 0) {
-                        throw new Exception("File '" + name + "' has a zero pool size.");
-                    }
-                    if (null == loadPool) {
-                        loadPool = new NodePool(size);
-                    }
-                    if (parse.getCurrentToken() != JsonToken.START_ARRAY) {
-                        throw new Exception("File '" + name + "' " + fieldName + " must begin with a START_ARRAY");
-                    }
-                    int index=0;
-
-                    if ("nodes".equals(fieldName)) {
-                        while (parse.nextToken() != JsonToken.END_ARRAY) {
-                            loadPool.setNode(index++, parse.getIntValue());
-                        }
-                    } else if ("materials".equals(fieldName)) {
-                        while (parse.nextToken() != JsonToken.END_ARRAY) {
-                            loadPool.setMaterial(index++, parse.getLongValue());
-                        }
-                    } else if ("paths".equals(fieldName)) {
-                        while (parse.nextToken() != JsonToken.END_ARRAY) {
-                            loadPool.setPath(index++, parse.getLongValue());
-                        }
-                    }
-                } else {
-                    tags.put(new Attributes.Name(fieldName), parse.toString());
-                }
-            }
-            parse.close(); // ensure resources get clean
-
-            System.out.println(loadPool);
-            return loadPool;
-
-        } catch (Exception e) {
-            System.out.println(e);
-            return null;
-        }
-    }
-
-
-
-    private int copyTileSubtree(NodePool srcPool, int srcTileIndex, NodePool dstPool) {
-        int srcIndex = 0;
-        int dstIndex = 0;
-        int dstTileIndex = 0;
-
-        // Copy this tile across
-        for (int child=0; child<8; ++child) {
-            srcIndex = srcTileIndex + child;
-            dstIndex = dstPool.getFree();
-            if (child == 0) dstTileIndex = dstIndex;
-
-            dstPool.setNode(dstIndex, srcPool.node(srcIndex));
-            dstPool.setMaterial(dstIndex, srcPool.material(srcIndex));
-            dstPool.setPath(dstIndex, srcPool.path(srcIndex));
-        }
-
-        // Now descend through the tile
-        for (int child=0; child<8; ++child) {
-            srcIndex = srcTileIndex + child;
-
-            if (Node.isNode(srcPool.node(srcIndex))) {
-                dstIndex = dstTileIndex + child;
-
-                srcIndex = copyTileSubtree(srcPool, Node.child(srcPool.node(srcIndex)), dstPool);
-
-                dstPool.setNode( dstIndex, Node.setChild( dstPool.node(dstIndex), srcIndex));
-            }
-        }
-
-        return dstTileIndex;
-    }
-
-    private NodePool compressTree() {
-        // Determine our size
-        NodePool.Statistics stats = nodePool.analyze();
-
-        // Allocate a just-right pool
-        NodePool newPool = new NodePool(stats.numUsed);
-
-        // Always a root node
-        int dstIndex = newPool.getFree();
-        int rootNode = nodePool.node(0);
-        newPool.setNode(dstIndex, rootNode);
-        newPool.setMaterial(dstIndex, nodePool.material(0));
-        newPool.setPath(dstIndex, nodePool.path(0));
-
-        if (!Node.isLeaf(rootNode)) {
-            try {
-                copyTileSubtree(nodePool, Node.child(rootNode), newPool);
-            } catch (Exception e) {
-                System.out.println(e);
-            }
-        }
-
-        return newPool;
-    }
-
+    /**
+     * String interpretation of the tree, for debugging purposes
+     *
+     * @return  String representation of the key tree features
+     */
     public String toString() {
         StringBuilder result = new StringBuilder();
         String NEW_LINE = System.getProperty("line.separator");

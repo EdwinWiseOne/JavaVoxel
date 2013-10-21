@@ -154,16 +154,16 @@ public class BrickFactory {
         if (reflect) _texture.transform |= Texture.REFLECT;
         if (square) _texture.transform |= Texture.SQUARE;
 
-        _texture.scale = scaleValue[scaleIdx];
-        _texture.quantLevel = quantValue[quantIdx];
+        _texture.inputScale = scaleValue[scaleIdx];
+        _texture.quantNum = quantValue[quantIdx];
         _texture.band = bandValue[bandIdx];
-        _texture.decay = decayValue[decayIdx];
+        _texture.curlScale = decayValue[decayIdx];
 
         System.out.println("BRICK # " + typeIdx +
-                " scale: " + _texture.scale +
+                " inputScale: " + _texture.inputScale +
                 ", band: " + _texture.band +
-                ", decay: " + _texture.decay +
-                ", quant: " + _texture.quantLevel +
+                ", curlScale: " + _texture.curlScale +
+                ", quant: " + _texture.quantNum +
                 ", invert " + invert +
                 ", reflect " + reflect +
                 ", square " + square );
@@ -177,23 +177,23 @@ public class BrickFactory {
 
         System.out.println("Saving '" + _name + "'");
 
-        tags.put(new Attributes.Name("scale"), new Double(_texture.scale).toString());
-        tags.put(new Attributes.Name("decay"), new Double(_texture.decay).toString());
+        tags.put(new Attributes.Name("inputScale"), new Double(_texture.inputScale).toString());
+        tags.put(new Attributes.Name("curlScale"), new Double(_texture.curlScale).toString());
         tags.put(new Attributes.Name("band"), new Double(_texture.band).toString());
-        tags.put(new Attributes.Name("quant"), new Integer(_texture.quantLevel).toString());
+        tags.put(new Attributes.Name("quant"), new Integer(_texture.quantNum).toString());
         tags.put(new Attributes.Name("transform"), new Integer(_texture.transform).toString());
         tags.put(new Attributes.Name("invert"), new Boolean(invert).toString());
         tags.put(new Attributes.Name("reflect"), new Boolean(reflect).toString());
         tags.put(new Attributes.Name("square"), new Boolean(square).toString());
 
-        tree.save(_name, tags);
+//        tree.save(_name, tags);
     }
 
 
     public static void load(VoxTree tree) {
         Attributes tags = new Attributes();
 
-        NodePool loadPool = tree.load(_name, tags);
+        NodePool loadPool = null; // tree.load(_name, tags);
         if (null == loadPool) {
             return;
         }
@@ -206,16 +206,16 @@ public class BrickFactory {
         reflect = new Boolean(tags.getValue("reflect"));
         square = new Boolean(tags.getValue("square"));
 
-        _texture.scale = new Double(Optional.of(tags.getValue("scale")).or("0.0"));
-        _texture.decay = new Double(tags.getValue("decay"));
+        _texture.inputScale = new Double(Optional.of(tags.getValue("inputScale")).or("0.0"));
+        _texture.curlScale = new Double(tags.getValue("curlScale"));
         _texture.band =  new Double(tags.getValue("band"));
-        _texture.quantLevel =  new Integer(tags.getValue("quant"));
+        _texture.quantNum =  new Integer(tags.getValue("quant"));
         _texture.transform =  new Integer(tags.getValue("transform"));
 
-        scaleIdx = findIndexForValue(_texture.scale, scaleValue);
-        decayIdx = findIndexForValue(_texture.decay, decayValue);
+        scaleIdx = findIndexForValue(_texture.inputScale, scaleValue);
+        decayIdx = findIndexForValue(_texture.curlScale, decayValue);
         bandIdx = findIndexForValue(_texture.band, bandValue);
-        quantIdx = findIndexForValue(_texture.quantLevel, quantValue);
+        quantIdx = findIndexForValue(_texture.quantNum, quantValue);
     }
 
     private static int findIndexForValue(double value, double[] values) {
@@ -377,9 +377,9 @@ public class BrickFactory {
 //                            Material.setMaterial(0x96, 0x4b, 0x00, 0xff, 128, 192));         // Med brown
 //                            Material.setMaterial(0xc9, 0xb0, 0x03, 0xF0, 192, 224));        // Yellow
 
-                    texture.scale *= 0.5;
+                    texture.inputScale *= 0.5;
                     density = texture.value(x*0.5, y*0.5, z*0.5);
-                    texture.scale *= 2.0;
+                    texture.inputScale *= 2.0;
                     setSkin(newTree, x, y, z, 2, Material.gradient(color1, color2, density));
                 }
             }
