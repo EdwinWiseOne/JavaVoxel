@@ -1,6 +1,7 @@
 import com.simreal.VoxEngine.Database;
 import com.simreal.VoxEngine.Material;
 import com.simreal.VoxEngine.VoxTree;
+import com.simreal.VoxEngine.brick.BrickFactory;
 
 import javax.swing.JFrame;
 import javax.vecmath.Point3d;
@@ -13,6 +14,7 @@ import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 
 public class BrickEditor extends Canvas implements Runnable {
+
 
     // TODO: Relevant constants in a configuration file / object
     // --------------------------------------
@@ -69,10 +71,11 @@ public class BrickEditor extends Canvas implements Runnable {
     private UserInput uiListeners;
 
     // --------------------------------------
-    // Brick data -- backing store and current brick tree
+    // Brick data -- backing store, current brick tree, and generator
     // --------------------------------------
     private Database database;
     private VoxTree tree;
+    private BrickFactory factory;
 
     // --------------------------------------
     // Misc
@@ -108,7 +111,12 @@ public class BrickEditor extends Canvas implements Runnable {
         // --------------------------------------
         // Database where the voxel data lives
         // --------------------------------------
-        database = new Database();
+        database = Database.instance();
+
+        // --------------------------------------
+        // Brick factory itself
+        // --------------------------------------
+        factory = BrickFactory.instance();
 
         // --------------------------------------
         // Voxel tree that holds the current subset of voxel data
@@ -142,7 +150,7 @@ public class BrickEditor extends Canvas implements Runnable {
         Thread thread = new Thread(this, "UI");
         thread.start();
 
-        uiListeners = UserInput.getUI(this, tree, database);
+        uiListeners = UserInput.instance(this, tree, database, factory);
 
         (new Thread(uiListeners)).start();
     }

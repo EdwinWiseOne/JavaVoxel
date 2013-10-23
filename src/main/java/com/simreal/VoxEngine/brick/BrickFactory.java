@@ -1,79 +1,166 @@
 package com.simreal.VoxEngine.brick;
 
-import com.google.common.base.Optional;
 import com.simreal.VoxEngine.Material;
-import com.simreal.VoxEngine.NodePool;
 import com.simreal.VoxEngine.Texture;
 import com.simreal.VoxEngine.VoxTree;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.codehaus.jackson.JsonFactory;
+import org.codehaus.jackson.JsonGenerator;
+import org.codehaus.jackson.JsonParser;
+import org.codehaus.jackson.JsonToken;
 
 import javax.vecmath.Point3i;
 import java.awt.event.KeyEvent;
-import java.util.jar.Attributes;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.StringReader;
+import java.io.StringWriter;
 
+/**
+ * The Brick Factory generates texture brick bases parametrically, and then allows
+ * them to be viewed and edited interactively.
+ *
+ * The Brick Factory is tied into the UserInput to process Control-Key behavior
+ * for selecting base bricks and adjusting the generator parameters.
+ *
+ * USE INPUT SCHEMA:
+ *
+ * Ctrl-Q           Cycle quantization value forwards
+ * Ctrl-Shift-Q     Cycle quantization value backwards
+ *
+ * Ctrl-B           Cycle the band clamp value forwards
+ * Ctrl-Shift-B     Cycle the band clamp value backwards
+ *
+ * Ctrl-S           Cycle the scaling value forwards
+ * Ctrl-Shift-S     Cycle the scaling value backwards
+ *
+ * Ctrl-D           Cycle the curl decay value forwards
+ * Ctrl-Shift-D     Cycle the curl decay value backwards
+ *
+ * Ctrl-R           Toggle the reflection flag
+ * Ctrl-Shift-R     Toggle the square flag
+ * Ctrl-I           Toggle the inversion flag
+ *
+ * TODO: a better method of selecting bricks, FAR MORE bricks
+ * TODO: Make better textures and colors; these are for testing
+ * Ctrl-0           Select brick pattern 0, test
+ * Ctrl-1           Select brick pattern 1, coal
+ * Ctrl-2           Select brick pattern 2, stone
+ * Ctrl-3           Select brick pattern 3, dirt
+ * Ctrl-4           Select brick pattern 4, steel
+ * Ctrl-5           Select brick pattern 5
+ * Ctrl-6           Select brick pattern 6
+ * Ctrl-7           Select brick pattern 7
+ * Ctrl-8           Select brick pattern 8
+ * Ctrl-9           Select brick pattern 9
+ * Ctrl-0           Select brick pattern 0
+ *
+ */
 public class BrickFactory {
 
-    interface BuildAction {
+    private static BrickFactory _brickFactoryInstance;
+
+    /**
+     * Builder actions generate a voxel brick under the current parameters.
+     */
+    interface BuilderAction {
         void build(VoxTree tree, Texture texture);
     }
+    private final BuilderAction[] builderActions;
 
-    private static final BuildAction[] buildActions = new BuildAction[] {
-            new BuildAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } },
-            new BuildAction() { public void build(VoxTree tree, Texture texture) { Coal(tree, texture); } },
-            new BuildAction() { public void build(VoxTree tree, Texture texture) { Stone(tree, texture); } },
-            new BuildAction() { public void build(VoxTree tree, Texture texture) { Dirt(tree, texture); } },
-            new BuildAction() { public void build(VoxTree tree, Texture texture) { Steel(tree, texture); } },
-            new BuildAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } },
-            new BuildAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } },
-            new BuildAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } },
-            new BuildAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } },
-            new BuildAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } },
-    };
-
+    /** Floating point equivalence */
     private static double EPSILON = 1e-9;
 
-//    private static VoxTree _tree = null;
-    private static Texture _texture = new Texture();
-    private static String _name = "test";
+    /** Texture generator */
+    private Texture texture;
 
-    private static int typeIdx = 0;
+    /** Parameter indices and booleans */
+    private String name;
+    private int typeIdx = 0;
+    private int scaleIdx = 0;
+    private int decayIdx = 0;
+    private int bandIdx = 0;
+    private int quantIdx = 0;
+    private boolean invert = false;
+    private boolean reflect = false;
+    private boolean square = false;
 
-    private static int scaleIdx = 0;
-    private static int decayIdx = 0;
-    private static int bandIdx = 0;
-    private static int quantIdx = 0;
-    private static boolean invert = false;
-    private static boolean reflect = false;
-    private static boolean square = false;
-
+    /** Parameter values in reasonable settings */
     private static final double[] scaleValue = {1.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.5, 0.75 };
     private static final double[] decayValue = {0.0, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0 };
     private static final double[] bandValue =  {0.0, 0.0, 0.1, 0.25, 0.5, 0.75, 0.90, 0.95 };
     private static final int[]    quantValue = {1, 2, 3, 4, 5, 6, 7, 8 };
 
+    /** Point buffer */
     private static Point3i voxPoint = new Point3i();
 
-    public static Texture texture() {
-        return _texture;
+    public static BrickFactory instance() {
+        if (_brickFactoryInstance == null) {
+            _brickFactoryInstance = new BrickFactory();
+        }
+
+        return _brickFactoryInstance;
     }
 
-    public static String name() {
-        return _name;
+    private BrickFactory() {
+        texture =  new Texture();
+        name = "test";
+
+        builderActions = new BuilderAction[] {
+                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } },
+                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Coal(tree, texture); } },
+                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Stone(tree, texture); } },
+                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Dirt(tree, texture); } },
+                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Steel(tree, texture); } },
+                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } },
+                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } },
+                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } },
+                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } },
+                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } }
+        };
     }
 
-    public static void keyPressed(KeyEvent e, VoxTree tree){
-        // Control is down for all Brick Factory events
+    /**
+     * Returns our texture object, complete with the current parametric settings, so that the texture
+     * can be applied in other contexts.
+     *
+     * @return      The texture generation object.
+     */
+    public Texture texture() {
+        return texture;
+    }
 
-        if (e.getKeyCode() == KeyEvent.VK_CONTROL) {
+    /**
+     * Return the name of the currently generated brick, though "test" is the default.
+     *
+     * @return      Brick name.
+     */
+    public String name() {
+        return name;
+    }
+
+    /**
+     * Process a Control-Key event and, if the key is relevant to our interests, regenerate
+     * the texture brick into the given {@link VoxTree}.  This will also erase any voxels
+     * currently  in the tree.
+     *
+     * @param key       Key event to process
+     * @param tree      VoxTree to generate the brick into.
+     */
+    public void keyPressed(KeyEvent key, VoxTree tree){
+        // Control must be down for all Brick Factory keys
+        if (key.getKeyCode() == KeyEvent.VK_CONTROL) {
             return;
         }
 
-        if (e.isShiftDown()) {
-            switch (e.getKeyCode()) {
+        if (key.isShiftDown()) {
+            // --------------------------------------
+            // Shifted events cycle backwards through the options, or set
+            // particular parameters.
+            // --------------------------------------
+            switch (key.getKeyCode()) {
                 case KeyEvent.VK_Q:
                     quantIdx = (quantIdx - 1) & 0x07;
-                    break;
-                case KeyEvent.VK_L:
-                    bandIdx = (bandIdx - 1) & 0x07;
                     break;
                 case KeyEvent.VK_S:
                     scaleIdx = (scaleIdx - 1) & 0x07;
@@ -90,7 +177,11 @@ public class BrickFactory {
             }
 
         } else {
-            switch (e.getKeyCode()) {
+            // --------------------------------------
+            // Unshifted events cycle forwards through the options, or set
+            // particular parameters.
+            // --------------------------------------
+            switch (key.getKeyCode()) {
                 case KeyEvent.VK_1:
                     typeIdx = 0;
                     break;
@@ -124,9 +215,6 @@ public class BrickFactory {
                 case KeyEvent.VK_Q:
                     quantIdx = (quantIdx + 1) & 0x07;
                     break;
-                case KeyEvent.VK_L:
-                    bandIdx = (bandIdx + 1) & 0x07;
-                    break;
                 case KeyEvent.VK_S:
                     scaleIdx = (scaleIdx + 1) & 0x07;
                     break;
@@ -145,102 +233,255 @@ public class BrickFactory {
             }
         }
 
-//        Texture _texture = new Texture();
-        _texture.transform = 0;
-        if (quantIdx > 0) _texture.transform |= Texture.QUANT;
-        if (bandIdx > 0) _texture.transform |= Texture.BANDCLAMP;
-        if (decayIdx > 0) _texture.transform |= Texture.CURL;
-        if (invert) _texture.transform |= Texture.INVERT;
-        if (reflect) _texture.transform |= Texture.REFLECT;
-        if (square) _texture.transform |= Texture.SQUARE;
+        // --------------------------------------
+        // Set the texture generation parameters and control flgas
+        // --------------------------------------
+        texture.inputScale = scaleValue[scaleIdx];
+        texture.quantNum = quantValue[quantIdx];
+        texture.band = bandValue[bandIdx];
+        texture.curlScale = decayValue[decayIdx];
 
-        _texture.inputScale = scaleValue[scaleIdx];
-        _texture.quantNum = quantValue[quantIdx];
-        _texture.band = bandValue[bandIdx];
-        _texture.curlScale = decayValue[decayIdx];
+        texture.transform = 0;
+        if (quantIdx > 0) texture.transform |= Texture.QUANT;
+        if (bandIdx > 0) texture.transform |= Texture.BANDCLAMP;
+        if (decayIdx > 0) texture.transform |= Texture.CURL;
+        if (invert) texture.transform |= Texture.INVERT;
+        if (reflect) texture.transform |= Texture.REFLECT;
+        if (square) texture.transform |= Texture.SQUARE;
 
+        // Log the parameters so we can see what we are doing
         System.out.println("BRICK # " + typeIdx +
-                " inputScale: " + _texture.inputScale +
-                ", band: " + _texture.band +
-                ", curlScale: " + _texture.curlScale +
-                ", quant: " + _texture.quantNum +
+                " inputScale: " + (scaleIdx == 0 ? "OFF" : texture.inputScale) +
+                ", band: " + (bandIdx == 0 ? "OFF" : texture.band) +
+                ", curlScale: " + (decayIdx == 0 ? "OFF" : texture.curlScale) +
+                ", quant: " + (quantIdx == 0 ? "OFF" : texture.quantNum) +
                 ", invert " + invert +
                 ", reflect " + reflect +
                 ", square " + square );
 
-//        _tree = tree;
-        buildActions[typeIdx].build(tree, _texture);
+        // --------------------------------------
+        // Build the brick
+        // --------------------------------------
+        builderActions[typeIdx].build(tree, texture);
     }
 
-    public static void save(VoxTree tree) {
-        Attributes tags = new Attributes();
+    /**
+     * Serialize the factory texture parameters into a JSON object
+     *
+     * TODO: Convert to Jackson automatic processing
+     * TODO: Name of the brick?
+     *
+     * @return  The JSON string representing the factory parameters
+     */
+    public String serializeJSON() {
+        JsonFactory jsonFactory = new JsonFactory();
+        StringWriter output = new StringWriter();
 
-        System.out.println("Saving '" + _name + "'");
+        try {
+            JsonGenerator gen = jsonFactory.createJsonGenerator(output);
 
-        tags.put(new Attributes.Name("inputScale"), new Double(_texture.inputScale).toString());
-        tags.put(new Attributes.Name("curlScale"), new Double(_texture.curlScale).toString());
-        tags.put(new Attributes.Name("band"), new Double(_texture.band).toString());
-        tags.put(new Attributes.Name("quant"), new Integer(_texture.quantNum).toString());
-        tags.put(new Attributes.Name("transform"), new Integer(_texture.transform).toString());
-        tags.put(new Attributes.Name("invert"), new Boolean(invert).toString());
-        tags.put(new Attributes.Name("reflect"), new Boolean(reflect).toString());
-        tags.put(new Attributes.Name("square"), new Boolean(square).toString());
+            gen.writeStartObject();
+            gen.writeStringField("version", "1.0.0");
+            gen.writeNumberField("transform", texture.transform);
+            gen.writeNumberField("quantize", texture.quantNum);
+            gen.writeNumberField("inputScale", texture.inputScale);
+            gen.writeNumberField("band", texture.band);
+            gen.writeNumberField("curlScale", texture.curlScale);
+            gen.writeEndObject();
 
-//        tree.save(_name, tags);
+            gen.close();
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+        return output.toString();
+
     }
 
+    /**
+     * Interpret a JSON string that should hold an object of parameters
+     * for the factory texture generator, setting those parameters in the factory's texture.
+     *
+     * @param json      JSON object holding the factory parameters
+     */
+    public void deserializeJSON(String json) {
+        StringReader input = new StringReader(json);
+        int size = 0;
 
-    public static void load(VoxTree tree) {
-        Attributes tags = new Attributes();
+        JsonFactory jsonFactory = new JsonFactory();
+        try {
+            JsonParser parse = jsonFactory.createJsonParser(input);
 
-        NodePool loadPool = null; // tree.load(_name, tags);
-        if (null == loadPool) {
+            if (parse.nextToken() != JsonToken.START_OBJECT) {
+                throw new Exception("Serialized data must begin with a START_OBJECT");
+            }
+            while (parse.nextToken() != JsonToken.END_OBJECT) {
+                String fieldName = parse.getCurrentName();
+                parse.nextToken(); // move to value
+
+                if ("version".equals(fieldName)) {
+                    if (!parse.getText().equals("1.0.0")) {
+                        throw new Exception("We only know how to parse version 1.0.0 at this time: " + parse.getText() + " is not valid.");
+                    }
+                } else if ("transform".equals(fieldName)) {
+                    texture.transform = parse.getIntValue();
+                } else if ("quantize".equals(fieldName)) {
+                    texture.quantNum = parse.getIntValue();
+                } else if ("inputScale".equals(fieldName)) {
+                    texture.inputScale = parse.getDoubleValue();
+                } else if ("band".equals(fieldName)) {
+                    texture.band = parse.getDoubleValue();
+                } else if ("curlScale".equals(fieldName)) {
+                    texture.curlScale = parse.getDoubleValue();
+                }
+            }
+            parse.close(); // ensure resources get clean
+
+            scaleIdx = findIndexForValue(texture.inputScale, scaleValue);
+            decayIdx = findIndexForValue(texture.curlScale, decayValue);
+            bandIdx = findIndexForValue(texture.band, bandValue);
+            quantIdx = findIndexForValue(texture.quantNum, quantValue);
+
             return;
+
+        } catch (Exception e) {
+            System.out.println(e);
         }
-
-        System.out.println("Loading '" + _name + "'");
-
-        tree.setPool(loadPool);
-
-        invert = new Boolean(tags.getValue("invert"));
-        reflect = new Boolean(tags.getValue("reflect"));
-        square = new Boolean(tags.getValue("square"));
-
-        _texture.inputScale = new Double(Optional.of(tags.getValue("inputScale")).or("0.0"));
-        _texture.curlScale = new Double(tags.getValue("curlScale"));
-        _texture.band =  new Double(tags.getValue("band"));
-        _texture.quantNum =  new Integer(tags.getValue("quant"));
-        _texture.transform =  new Integer(tags.getValue("transform"));
-
-        scaleIdx = findIndexForValue(_texture.inputScale, scaleValue);
-        decayIdx = findIndexForValue(_texture.curlScale, decayValue);
-        bandIdx = findIndexForValue(_texture.band, bandValue);
-        quantIdx = findIndexForValue(_texture.quantNum, quantValue);
     }
 
-    private static int findIndexForValue(double value, double[] values) {
+    /**
+     * Serialize the factory texture parameters into a byte array
+     *
+     * @return  The byte array representing the factory parameters
+     */
+    public byte[] serializeBytes() {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+        try {
+            String version = "1.0.0";
+
+            output.write(Bytes.toBytes(version.length()));
+            output.write(Bytes.toBytes(version));
+            output.write(Bytes.toBytes(texture.transform));
+            output.write(Bytes.toBytes(texture.quantNum));
+            output.write(Bytes.toBytes(texture.inputScale));
+            output.write(Bytes.toBytes(texture.band));
+            output.write(Bytes.toBytes(texture.curlScale));
+
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+
+        return output.toByteArray();
+    }
+
+    public void deserializeBytes(byte[] source) {
+        ByteArrayInputStream input = new ByteArrayInputStream(source);
+        int size = 0;
+
+        byte[] buf = new byte[8];
+
+        String version;
+        int strLen;
+
+        try {
+            input.read(buf, 0, Integer.SIZE/8);
+            strLen = Bytes.toInt(buf);
+
+            input.read(buf, 0, strLen);
+            version = Bytes.toString(buf);
+
+            if (!version.equals("1.0.0")) {
+                throw new Exception("We only know how to parse version 1.0.0 at this time: " + version + " is not valid.");
+            }
+
+            input.read(buf, 0, Integer.SIZE/8);
+            texture.transform = Bytes.toInt(buf);
+
+            input.read(buf, 0, Integer.SIZE/8);
+            texture.quantNum = Bytes.toInt(buf);
+
+            input.read(buf, 0, Double.SIZE/8);
+            texture.inputScale = Bytes.toDouble(buf);
+
+            input.read(buf, 0, Double.SIZE/8);
+            texture.band = Bytes.toDouble(buf);
+
+            input.read(buf, 0, Double.SIZE/8);
+            texture.curlScale = Bytes.toDouble(buf);
+
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+    }
+
+    /**
+     * Given a parameter value, find the index that best represents it in an array
+     * of possible values.
+     *
+     * @param value     Value to find in an array
+     * @param values    Array of possible values to search
+     * @return          The index of the value as found in the array of values
+     */
+    private int findIndexForValue(double value, double[] values) {
         int index = 0;
+        double distance;
+        double minDist = Double.MAX_VALUE;
+        int minIndex = -1;
+
         for (double test : values) {
-            if (Math.abs(test - value) < EPSILON) {
+            distance = Math.abs(test - value);
+            // If we hit it dead on, return early
+            if (distance < EPSILON) {
                 return index;
+            } else if (distance < minDist) {
+                minIndex = index;
+                minDist = distance;
             }
             ++index;
         }
-        return 0;
+        return minIndex;
     }
 
-    private static int findIndexForValue(int value, int[] values) {
+    /**
+     * Given a parameter value, find the index that best represents it in an array
+     * of possible values.
+     *
+     * @param value     Value to find in an array
+     * @param values    Array of possible values to search
+     * @return          The index of the value as found in the array of values
+     */
+    private int findIndexForValue(int value, int[] values) {
         int index = 0;
+        int distance;
+        int minDist = Integer.MAX_VALUE;
+        int minIndex = -1;
+
         for (int test : values) {
-            if (test == value) {
+            distance = Math.abs(test - value);
+            // If we hit it dead on, return early
+            if (distance == 0) {
                 return index;
+            } else if (distance < minDist) {
+                minIndex = index;
+                minDist = distance;
             }
             ++index;
         }
-        return 0;
+        return minIndex;
     }
 
-    private static boolean isSkin(VoxTree tree, int x, int y, int z, int w) {
+    /**
+     * Determine if a given coordinate is on the skin of the voxel tree's extent, given
+     * a skin thickness (in leaf voxels).
+     *
+     * @param tree    Tree that we are operating on, which defines the total extents
+     * @param x       X ordinate to set
+     * @param y       Y ordinate to set
+     * @param z       Z ordinate to set
+     * @param w       Skin thickness (1 or larger, typically 1 or 2)
+     * @return        True if the coordinate is within the "skin" layer of the voxel tree
+     */
+    private boolean isSkin(VoxTree tree, int x, int y, int z, int w) {
         int edge = tree.breadth() - 1;
 
         if ( ( x < w )
@@ -256,7 +497,18 @@ public class BrickFactory {
         return false;
     }
 
-    private static void setSkin(VoxTree tree, int x, int y, int z, int w, long material) {
+    /**
+     * Set a voxel in the tree, but only set the voxel to the indicated value if
+     * it is in the skin of the tree... interior voxels are set to empty.
+     *
+     * @param tree        Tree that we are operating upon, to set the voxel in
+     * @param x           X ordinate to set
+     * @param y           Y ordinate to set
+     * @param z           Z ordinate to set
+     * @param w           Skin thickness (1 or larger)
+     * @param material    Material value to set the voxel to
+     */
+    private void setSkin(VoxTree tree, int x, int y, int z, int w, long material) {
         int stride = tree.stride();
         int offset = stride >> 1;
 
@@ -270,10 +522,10 @@ public class BrickFactory {
     }
 
 
-    public static void Test(VoxTree tree, Texture texture) {
+    public void Test(VoxTree tree, Texture texture) {
         VoxTree newTree = new VoxTree(tree.depth());
 
-        _name = "test";
+        name = "test";
 
         int stride = newTree.stride();
         int offset = stride >> 1;
@@ -298,21 +550,21 @@ public class BrickFactory {
         tree.setPool(newTree.nodePool());
     }
 
-    public static void Coal(VoxTree tree, Texture texture) {
+    public void Coal(VoxTree tree, Texture texture) {
         VoxTree newTree = new VoxTree(tree.depth());
 
-        _name = "coal";
+        name = "coal";
 
         for (int x=0; x<tree.breadth(); ++x){
             for (int y=0; y<tree.breadth(); ++y){
                 for (int z=0; z<tree.breadth(); ++z) {
 
-                    int density = Texture.toByte(BrickFactory.texture().value(x, y, z));
+                    int density = Texture.toByte(texture.value(x, y, z));
 
                     long color1 = Material.setMaterial(0xE0, 0xE0, 0xE0, 164, 192, 255);
                     long color2 = Material.setMaterial(30, 30, 30, density, 64, 0);
 
-                    long color = Material.blend(color2, color1);
+                    long color = Material.alphaBlend(color2, color1);
 
 
                     setSkin(newTree, x, y, z, 2, color);
@@ -323,10 +575,10 @@ public class BrickFactory {
         tree.setPool(newTree.nodePool());
     }
 
-    public static void Stone(VoxTree tree, Texture texture) {
+    public void Stone(VoxTree tree, Texture texture) {
         VoxTree newTree = new VoxTree(tree.depth());
 
-        _name = "stone";
+        name = "stone";
 
         for (int x=0; x<tree.breadth(); ++x){
             for (int y=0; y<tree.breadth(); ++y){
@@ -353,10 +605,10 @@ public class BrickFactory {
         tree.setPool(newTree.nodePool());
     }
 
-    public static void Dirt(VoxTree tree, Texture texture) {
+    public void Dirt(VoxTree tree, Texture texture) {
         VoxTree newTree = new VoxTree(tree.depth());
 
-        _name = "dirt";
+        name = "dirt";
 
         for (int x=0; x<tree.breadth(); ++x){
             for (int y=0; y<tree.breadth(); ++y){
@@ -388,11 +640,10 @@ public class BrickFactory {
         tree.setPool(newTree.nodePool());
     }
 
-    public static void Steel(VoxTree tree, Texture texture) {
+    public void Steel(VoxTree tree, Texture texture) {
         VoxTree newTree = new VoxTree(tree.depth());
 
-        _name = "steel";
-        _name = "steel";
+        name = "steel";
 
         for (int x=0; x<tree.breadth(); ++x){
             for (int y=0; y<tree.breadth(); ++y){

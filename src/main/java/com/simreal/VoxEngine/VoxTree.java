@@ -503,7 +503,7 @@ public class VoxTree {
      * the color along the path is fully defined.
      *
      * Picking returns color, but also sets the internal details of the picked voxel
-     * for access later.  See {@link pickNodePath}, {@link pickNodeIndex}, {@link pickFacet}, and {@link pickRay}
+     * for access later.  See {@link #pickNodePath}, {@link #pickNodeIndex}, {@link #pickFacet}, and {@link #pickRay}
      *
      * @param inOrigin  Viewpoint origin in the world
      * @param inRay     Normalized ray to traverse
@@ -589,7 +589,7 @@ public class VoxTree {
         double tick = (double)(System.currentTimeMillis()-startTime) / 1000.0;
 
         // Blend material from casting, with black with alpha from textured noise; black texture overlay
-        material = Material.blend(
+        material = Material.alphaBlend(
                 material,
                 Material.setMaterial(0, 0, 0,
                         Texture.toByte(BrickFactory.texture().value(inRay.x * screenFactor, inRay.y * screenFactor, tick)),
@@ -597,8 +597,8 @@ public class VoxTree {
 
         // Additional blending of pure noise driving the red channel; red static behind the texture
         return Material.RGBA(
-                Material.blend(material,
-                Material.setMaterial(rand.nextInt(256), 0, 0, 255, 255, 32)));
+                Material.alphaBlend(material,
+                        Material.setMaterial(rand.nextInt(256), 0, 0, 255, 255, 32)));
     }
 
     /**
@@ -728,8 +728,8 @@ public class VoxTree {
                             light.scale(Lighting.pulse());
                         }
 
-                        // Light the new material and blend it with the accumulated material
-                        material = Material.blend(material, Lighting.illuminate(newMaterial, normal, light, view));
+                        // Light the new material and alphaBlend it with the accumulated material
+                        material = Material.alphaBlend(material, Lighting.BlinnPhongFixedLight(newMaterial, normal, light, view));
 
                         // If we have a decent opacity, exit
                         if (Material.alpha(material) >= 250)

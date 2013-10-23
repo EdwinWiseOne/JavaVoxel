@@ -34,7 +34,11 @@ public class NodePool {
     /** Marker for the end of the node chain */
     public static final int NO_FREE_NODE_INDEX = -1;
 
-    /**
+    /** Marker for the child of the last node in the free node chain */
+     public static final int END_OF_FREE_NODES = 0;
+
+
+     /**
      * Construct an empty, null node pool
      */
     public NodePool() {
@@ -76,7 +80,7 @@ public class NodePool {
             materials[idx] = 0L;
             paths[idx] = 0L;
         }
-        nodes[numNodes-1] = Node.END_OF_FREE_NODES;
+        nodes[numNodes-1] = END_OF_FREE_NODES;
     }
 
     /**
@@ -124,7 +128,7 @@ public class NodePool {
     public int getFree() {
         int freeNodeIndex = firstFreeNode;
         firstFreeNode = Node.child(nodes[freeNodeIndex]);
-        if (firstFreeNode == Node.END_OF_FREE_NODES) {
+        if (firstFreeNode == END_OF_FREE_NODES) {
             firstFreeNode = NO_FREE_NODE_INDEX;
         }
         nodes[freeNodeIndex] = Node.setUsed(nodes[freeNodeIndex], true);
@@ -139,7 +143,7 @@ public class NodePool {
     public void putFree(int nodeIndex) {
         int nextFree = firstFreeNode;
         if (nextFree == NO_FREE_NODE_INDEX) {
-            nextFree = Node.END_OF_FREE_NODES;
+            nextFree = END_OF_FREE_NODES;
         }
 
         nodes[nodeIndex] = Node.setUsed(Node.setChild(0, nextFree), false);
@@ -370,8 +374,10 @@ public class NodePool {
             JsonGenerator gen = jsonFactory.createJsonGenerator(output);
 
             gen.writeStartObject();
+            gen.writeStringField("version", "1.0.0");
             gen.writeNumberField("size", numNodes);
             gen.writeArrayFieldStart("nodes");
+
             // To make more clean, would need to store pool as ByteBuffer (and cast to LongBuffer, etc)
             for (int index=0; index<numNodes; ++index) {
                 gen.writeNumber(nodes[index]);
@@ -401,31 +407,6 @@ public class NodePool {
     }
 
     /**
-     * Convert the entire node pool into a byte array
-     *
-     * @return  Byte array representing the node pool
-     */
-    public byte[] serializeBytes() {
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-
-        output.write(Bytes.toBytes(numNodes), 0, Integer.SIZE/8);
-
-        for (int val : nodes) {
-            output.write(Bytes.toBytes(val), 0, Integer.SIZE/8);
-        }
-
-        for (long val : materials) {
-            output.write(Bytes.toBytes(val), 0, Long.SIZE/8);
-        }
-
-        for (long val : paths) {
-            output.write(Bytes.toBytes(val), 0, Long.SIZE/8);
-        }
-
-        return output.toByteArray();
-    }
-
-    /**
      * Interpret a massive JSON string and fill this node pool with the data
      *
      * @param json      JSON representation of a node pool
@@ -445,7 +426,11 @@ public class NodePool {
                 String fieldName = parse.getCurrentName();
                 parse.nextToken(); // move to value, or START_OBJECT/START_ARRAY
 
-                if ("size".equals(fieldName)) {
+                if ("version".equals(fieldName)) {
+                    if (!parse.getText().equals("1.0.0")) {
+                        throw new Exception("We only know how to parse version 1.0.0 at this time: " + parse.getText() + " is not valid.");
+                    }
+                } else if ("size".equals(fieldName)) {
                     size = parse.getIntValue();
                     init(size);
                 } else if (Arrays.asList("nodes", "materials", "paths").contains(fieldName)) {
@@ -483,7 +468,33 @@ public class NodePool {
     }
 
     /**
-     * Interpret a byte array and fill this node pool with the data
+     * Convert the entire node pool into a byte array
+     *
+     * @return  Byte array representing the node pool
+     */
+    public byte[] serializeBytes() {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+        output.write(Bytes.toBytes(numNodes), 0, Integer.SIZE/8);
+
+        for (int val : nodes) {
+            output.write(Bytes.toBytes(val), 0, Integer.SIZE/8);
+        }
+
+        for (long val : materials) {
+            output.write(Bytes.toBytes(val), 0, Long.SIZE/8);
+        }
+
+        for (long val : paths) {
+            output.write(Bytes.toBytes(val), 0, Long.SIZE/8);
+        }
+
+        return output.toByteArray();
+    }
+
+
+    /**
+     * Interpret a byte array and fill this node pool with the data.  Any current existing data is lost.
      *
      * @param source    Byte array holding a serialized node pool
      */

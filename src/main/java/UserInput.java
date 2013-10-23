@@ -1,6 +1,5 @@
 import com.simreal.VoxEngine.Database;
 import com.simreal.VoxEngine.Material;
-import com.simreal.VoxEngine.NodePool;
 import com.simreal.VoxEngine.Path;
 import com.simreal.VoxEngine.VoxTree;
 import com.simreal.VoxEngine.brick.BrickFactory;
@@ -21,7 +20,11 @@ import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 
 /**
+ * Processes user input via keyboard and mouse.
+ *
  * USER INPUT SCHEMA
+ *
+ * KEYBOARD
  *
  * Ctrl-*   BrickFactory commands
  *
@@ -38,18 +41,25 @@ import java.awt.event.MouseMotionListener;
  * S        Move Backwards
  * W        Move Forwards
  *
+ * MOUSE
+ *
  * Click Left   Set Voxel to Color
  * Click Right  Erase Voxel
  * Mouse Move   Change Heading
  */
 public class UserInput implements Runnable, KeyListener, MouseListener, MouseMotionListener {
 
-    private static UserInput userInput;
+    // --------------------------------------
+    // Singleton instance
+    // --------------------------------------
+    private static UserInput _userInputInstance = null;
+    // --------------------------------------
 
     // Core properties
     private Canvas canvas;
     private VoxTree tree;
     private Database storage;
+    private BrickFactory factory;
 
     // Interface Robot
     private Robot robot;
@@ -89,10 +99,10 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
      * @param tree      VoxTree with rendering data
      * @return          The one instance of UserInput (constructed during the first call)
      */
-    public static UserInput getUI(Canvas canvas, VoxTree tree, Database storage){
-        if (userInput == null) userInput = new UserInput(canvas, tree, storage);
+    public static UserInput instance(Canvas canvas, VoxTree tree, Database storage, BrickFactory factory){
+        if (_userInputInstance == null) _userInputInstance = new UserInput(canvas, tree, storage, factory);
 
-        return userInput;
+        return _userInputInstance;
     }
 
     /**
@@ -102,12 +112,14 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
      * @param tree      VoxTree with rendering data
      * @param storage   Database backing store for load and save
      */
-    private UserInput(Canvas canvas, VoxTree tree, Database storage){
+    private UserInput(Canvas canvas, VoxTree tree, Database storage, BrickFactory factory){
 
         // --------------------------------------
-        // The tree is what we are looking it, yo
+        // Current and long term backing data
         // --------------------------------------
         this.tree = tree;
+        this.storage = storage;
+        this.factory = factory;
 
         // --------------------------------------
         // Robot is used to capture the mouse cursor into the middle of the canvas.
@@ -255,12 +267,10 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
             // --------------------------------------
             switch (key.getKeyCode()) {
                 default:
-                    BrickFactory.keyPressed(key, tree);
+                    factory.keyPressed(key, tree);
                     break;
             }
         } else if (key.isAltDown()) {
-            Database db;
-
             // --------------------------------------
             // Alt keys (triggering commands)
             // --------------------------------------
@@ -274,15 +284,12 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
 
                 // Save the current brick
                 case KeyEvent.VK_S:
-                    db = new Database();
-                    db.putBrick("test", tree.nodePool().compress());
+                    storage.putBrick(factory.name(), tree.nodePool().compress(), factory);
                     break;
 
                 // Load into the current brick
                 case KeyEvent.VK_L:
-                    db = new Database();
-                    NodePool loadPool = db.getBrick("test");
-                    tree.setPool(loadPool);
+                    storage.getBrick(factory.name(), tree.nodePool(), factory);
                     break;
             }
 
