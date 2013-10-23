@@ -20,7 +20,7 @@ public class Lighting {
     private Lighting() {
     }
 
-    public Lighting instance() {
+    static public Lighting instance() {
         if (_lightingInstance == null) {
             _lightingInstance = new Lighting();
         }

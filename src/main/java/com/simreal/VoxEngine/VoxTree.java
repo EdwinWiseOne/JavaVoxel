@@ -79,6 +79,8 @@ public class VoxTree {
     // Holds the actual data
     // --------------------------------------
     NodePool nodePool;
+    BrickFactory factory;
+    Lighting lighting;
 
     // --------------------------------------
     // Raycasting
@@ -139,6 +141,12 @@ public class VoxTree {
         // Root node
         int nodeIndex = nodePool.getFree();
         nodePool.set(nodeIndex, Node.setLeaf(nodePool.node(nodeIndex), true), 0L, 0L);
+
+        // --------------------------------------
+        // Helper objects
+        // --------------------------------------
+        factory = BrickFactory.instance();
+        lighting = Lighting.instance();
 
         // --------------------------------------
         // Define the world cube
@@ -592,7 +600,7 @@ public class VoxTree {
         material = Material.alphaBlend(
                 material,
                 Material.setMaterial(0, 0, 0,
-                        Texture.toByte(BrickFactory.texture().value(inRay.x * screenFactor, inRay.y * screenFactor, tick)),
+                        Texture.toByte(factory.texture().value(inRay.x * screenFactor, inRay.y * screenFactor, tick)),
                         32, 32));
 
         // Additional blending of pure noise driving the red channel; red static behind the texture
@@ -725,11 +733,11 @@ public class VoxTree {
 
                         // Indicator on any picked voxel facet
                         if ((pickNodeIndex > 0) && (pickNodeIndex == state.nodeIndex) && (pickFacet == facet) ){
-                            light.scale(Lighting.pulse());
+                            light.scale(lighting.pulse());
                         }
 
                         // Light the new material and alphaBlend it with the accumulated material
-                        material = Material.alphaBlend(material, Lighting.BlinnPhongFixedLight(newMaterial, normal, light, view));
+                        material = Material.alphaBlend(material, lighting.BlinnPhongFixedLight(newMaterial, normal, light, view));
 
                         // If we have a decent opacity, exit
                         if (Material.alpha(material) >= 250)
