@@ -3,6 +3,12 @@ package com.simreal.VoxEngine;
 public class TextureTest {
 
 /*
+TODO: Implement TextureTest
+TODO: Implement DatabaseTest
+TODO: Implement LightingTest
+TODO: Implement NodePoolTest
+TODO: Implement the various serialize/deserialize tests (if not in the above)
+
     double high = -9.0;
     double low = 9.0;
     double val;

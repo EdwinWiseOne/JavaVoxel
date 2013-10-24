@@ -47,6 +47,6 @@ public class MaterialTest {
     public void colorStringTest() {
         long color = Material.setMaterial(10, 20, 30, 40, 50, 60);
         String str = Material.toString(color);
-        Assert.assertEquals(str, "RGBAar { 0A, 14, 1E, 28, 32, 3C }");
+        Assert.assertEquals(str, "Material { R0A, G14, B1E, A28, a32, r3C }");
     }
 }

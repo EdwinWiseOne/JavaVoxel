@@ -22,7 +22,7 @@ public class VoxTreeTest {
         Assert.assertEquals(tree.edgeLength, (1<<DEPTH) * VoxTree.BRICK_EDGE);
         Assert.assertEquals(tree.stride(), VoxTree.BRICK_EDGE);
 
-        NodePool.Statistics stats = tree.nodePool.analyze();
+        NodePool.Statistics stats = tree.nodePool.analyze(0);
         Assert.assertEquals(stats.numLeaves, 1);
         Assert.assertEquals(stats.numNodes, 0);
     }
@@ -80,7 +80,7 @@ System.out.println(tree);
 
             int leaves = (Integer)row[3];
             int nodes = (Integer)row[4];
-            NodePool.Statistics stats = tree.nodePool.analyze();
+            NodePool.Statistics stats = tree.nodePool.analyze(0);
             Assert.assertEquals(stats.numLeaves, leaves);
             Assert.assertEquals(stats.numNodes, nodes);
         }

@@ -513,12 +513,14 @@ public class VoxTree {
      * Picking returns color, but also sets the internal details of the picked voxel
      * for access later.  See {@link #pickNodePath}, {@link #pickNodeIndex}, {@link #pickFacet}, and {@link #pickRay}
      *
-     * @param inOrigin  Viewpoint origin in the world
-     * @param inRay     Normalized ray to traverse
-     * @param pick      True if we are picking and not rendering
-     * @return          Color of voxels along the ray (or picked voxel)
+     *
+     * @param inOrigin      Viewpoint origin in the world
+     * @param inRay         Normalized ray to traverse
+     * @param timestamp     Some form of advancing timestamp, used to determine voxel visibility between scans
+     * @param pick          True if we are picking and not rendering
+     * @return              Color of voxels along the ray (or picked voxel)
      */
-    public int castRay(Point3d inOrigin, Vector3d inRay, boolean pick){
+    public int castRay(Point3d inOrigin, Vector3d inRay, int timestamp, boolean pick){
         // Record a pick detail
         if (pick) {
             pickRay.set(inRay);
@@ -579,7 +581,7 @@ public class VoxTree {
             if ((t1.x >= 0.0) && (t1.y >= 0.0) && (t1.z >= 0.0)) {
 
                 // --------------------------------------
-                material = castSubtree(t0, t1, inRay, pick);
+                material = castSubtree(t0, t1, inRay, timestamp, pick);
                 // --------------------------------------
 
                 if (pick || (Material.alpha(material) >= 250))
@@ -615,13 +617,15 @@ public class VoxTree {
      *
      * Based tightly on the work of GigaVoxels:  http://maverick.inria.fr/Publications/2009/CNLE09/
      *
-     * @param t0      Near crossing of the ray as it enters the tree, distance along ray
-     * @param t1      Far crossing of the ray as it exits the tree, distance along ray
-     * @param view    View vector, used for lighting the voxels caught in the ray
-     * @param pick    True if picking instead of rendering
-     * @return        Accumulated material along the ray
+     *
+     * @param t0        Near crossing of the ray as it enters the tree, distance along ray
+     * @param t1        Far crossing of the ray as it exits the tree, distance along ray
+     * @param view      View vector, used for lighting the voxels caught in the ray
+     * @param timestamp Some form of advancing timestamp, used to determine voxel visibility between scans
+     * @param pick      True if picking instead of rendering
+     * @return          Accumulated material along the ray
      */
-    private long castSubtree(Point3d t0, Point3d t1, Vector3d view, boolean pick){
+    private long castSubtree(Point3d t0, Point3d t1, Vector3d view, int timestamp, boolean pick){
 
         // Working variables
         Point3d tM1 = new Point3d();    // Midpoint of t0 and t1
@@ -654,6 +658,7 @@ public class VoxTree {
             // --------------------------------------
             state.set(stateStack[--stateStackTop]);
             int node = nodePool.node(state.nodeIndex);
+            nodePool.stamp(state.nodeIndex, timestamp);
 
             // --------------------------------------
             // If picking, we must traverse to the very bottom of the tree

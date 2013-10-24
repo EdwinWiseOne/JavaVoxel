@@ -174,8 +174,9 @@ public class BrickEditor extends Canvas implements Runnable {
         // --------------------------------------
         // Run forever...
         // --------------------------------------
+        int scan = 0;
         while (running){
-            render();
+            render(++scan);
 
             // --------------------------------------
             // Performance statistics, logged every 10 seconds
@@ -194,7 +195,7 @@ public class BrickEditor extends Canvas implements Runnable {
     /**
      * Create and render one image frame.
      */
-    public void render(){
+    public void render(int scan){
 
         BufferStrategy bs = this.getBufferStrategy();
         if(bs == null){
@@ -205,7 +206,7 @@ public class BrickEditor extends Canvas implements Runnable {
 
         Graphics g = bs.getDrawGraphics();
 
-        g.drawImage(createImg(), 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, java.awt.Color.BLACK, null);
+        g.drawImage(createImg(scan), 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, java.awt.Color.BLACK, null);
 
         g.dispose();
 
@@ -251,7 +252,7 @@ public class BrickEditor extends Canvas implements Runnable {
      *
      * @return  BufferedImage object suitable for framing.  Or rendering to the canvas.
      */
-    public BufferedImage createImg(){
+    public BufferedImage createImg(int scan){
 
         // --------------------------------------
         // Get the backing pixels
@@ -267,7 +268,7 @@ public class BrickEditor extends Canvas implements Runnable {
         // --------------------------------------
         // Picking ray in the center of the canvas
         // --------------------------------------
-        tree.castRay(viewPoint, fwVec, true);
+        tree.castRay(viewPoint, fwVec, scan, true);
 
         // --------------------------------------
         // Scan the entire view canvas and cast a ray from the viewpoint through each canvas point
@@ -286,7 +287,7 @@ public class BrickEditor extends Canvas implements Runnable {
             facing.sub(at, viewPoint);
             facing.normalize();
 
-            pixels[i] = tree.castRay(viewPoint, facing, false);
+            pixels[i] = tree.castRay(viewPoint, facing, scan, false);
 
             at.sub(ltVec);  // Advance X position
         }

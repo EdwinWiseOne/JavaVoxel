@@ -12,6 +12,8 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.Arrays;
 
+// TODO: CRITICAL CHANGE -- all nodes in the pool MUST BE part of an 8-child tile... all usage must be by TILE.  Remove the root node.
+
 /**
  * The NodePool is the backing store for the {@link VoxTree}, holding all of the {@link Node} representations,
  * {@link Material} choices, and {@Path} identifiers in use.
@@ -30,6 +32,14 @@ public class NodePool {
     private long[] materials;
     /** Path meta data */
     private long[] paths;
+    /** Visibility usage timestamps */
+    private int[] usage;
+    /** The most recently used timestamp */
+    private int now;
+    /** LRU list */
+    private int[] lru;
+    /** The number of visible nodes in the LRU */
+    private int mruNum;
 
     /** Marker for the end of the node chain */
     public static final int NO_FREE_NODE_INDEX = -1;
@@ -70,6 +80,8 @@ public class NodePool {
         nodes = new int[numNodes];
         materials = new long[numNodes];
         paths = new long[numNodes];
+        usage = new int[numNodes];
+        lru = new int[numNodes];
 
         // --------------------------------------
         // Chain together all of the free nodes
@@ -79,6 +91,8 @@ public class NodePool {
             nodes[idx] = Node.setChild(0, idx+1);
             materials[idx] = 0L;
             paths[idx] = 0L;
+            usage[idx] = 0;
+            lru[idx] = 0;
         }
         nodes[numNodes-1] = END_OF_FREE_NODES;
     }
@@ -272,6 +286,24 @@ public class NodePool {
     }
 
     /**
+     * Sets the usage timestamp for the node at the given index in the pool
+     *
+     * @param index         Index of the node in the pool
+     * @param timestamp     Scan number or other timestamp to set
+     * @throws RuntimeException
+     */
+    public void stamp(int index, int timestamp)
+            throws RuntimeException {
+
+        if ((index < 0) || (index >= numNodes)) {
+            throw new RuntimeException("NodePool index out of bounds");
+        }
+
+        usage[index] = timestamp;
+        now = timestamp;
+    }
+
+    /**
      * Compresses the node pool, creating a new pool with only the nodes in use.
      *
      * @return      New, compressed node pool
@@ -280,7 +312,7 @@ public class NodePool {
         // --------------------------------------
         // Determine the number of nodes in use
         // --------------------------------------
-        NodePool.Statistics stats = analyze();
+        NodePool.Statistics stats = analyze(now);
 
         // --------------------------------------
         // Allocate a just-right pool
@@ -295,6 +327,7 @@ public class NodePool {
         newPool.setNode(dstIndex, rootNode);
         newPool.setMaterial(dstIndex, materials[0]);
         newPool.setPath(dstIndex, paths[0]);
+        newPool.stamp(dstIndex, usage[0]);
 
         // --------------------------------------
         // If there are more nodes than the root, recursively copy the children
@@ -337,6 +370,7 @@ public class NodePool {
             dstPool.setNode(dstIndex, nodes[srcIndex]);
             dstPool.setMaterial(dstIndex, materials[srcIndex]);
             dstPool.setPath(dstIndex, paths[srcIndex]);
+            dstPool.stamp(dstIndex, usage[srcIndex]);
         }
 
         // --------------------------------------
@@ -359,6 +393,18 @@ public class NodePool {
 
         return dstTileIndex;
     }
+
+    /*
+    Stream Compaction
+    http://www.cse.chalmers.se/~uffe/streamcompaction.pdf
+    http://http.developer.nvidia.com/GPUGems2/gpugems2_chapter36.html
+    http://www.seas.upenn.edu/~cis565/LECTURES/CUDA%20Tricks.pdf
+     */
+    public void processLRU() {
+        // Count valid usages
+        // Generate the LRU indirection table
+    }
+
 
 
     /**
@@ -397,6 +443,8 @@ public class NodePool {
                 gen.writeNumber(paths[index]);
             }
             gen.writeEndArray();
+
+            // Usage timestamps are NOT serialized
 
             gen.writeEndObject();
             gen.close();
@@ -456,6 +504,7 @@ public class NodePool {
                             paths[index++] = parse.getLongValue();
                         }
                     }
+                    // Usage timestamps are NOT serialized
                 }
             }
             parse.close(); // ensure resources get clean
@@ -488,6 +537,8 @@ public class NodePool {
         for (long val : paths) {
             output.write(Bytes.toBytes(val), 0, Long.SIZE/8);
         }
+
+        // Usage timestamps are NOT serialized
 
         return output.toByteArray();
     }
@@ -523,6 +574,7 @@ public class NodePool {
             input.read(buf, 0, Long.SIZE/8);
             paths[cnt]= Bytes.toLong(buf);
         }
+        // Usage timestamps are NOT serialized
     }
 
     /**
@@ -535,20 +587,24 @@ public class NodePool {
         public int numNodes;
         /** Nodes in use that are leaves */
         public int numLeaves;
+        /** Nodes that were used in the indicated timestamp */
+        public int numVisible;
 
         Statistics() {
             numUsed = 0;
             numNodes = 0;
             numLeaves = 0;
+            numVisible = 0;
         }
     }
 
     /**
      * Scan the node pool and log the count of the various types of nodes
      *
-     * @return  Instance of the Statistics object holding the counts
+     * @param when      Timestamp to run the analysis against
+     * @return          Instance of the Statistics object holding the counts
      */
-    Statistics analyze() {
+    Statistics analyze(int when) {
         Statistics stats = new Statistics();
 
         int node;
@@ -560,6 +616,8 @@ public class NodePool {
                     ++stats.numLeaves;
                 else
                     ++stats.numNodes;
+                if (usage[idx] == when)
+                    ++stats.numVisible;
             }
         }
 
@@ -576,11 +634,22 @@ public class NodePool {
         StringBuilder result = new StringBuilder();
         String NEW_LINE = System.getProperty("line.separator");
 
-        NodePool.Statistics stats = analyze();
+        NodePool.Statistics stats = analyze(now);
 
         result.append(this.getClass()).append(" NodePool {").append(NEW_LINE);
-        result.append("   Free Node: ").append(firstFreeNode).append(" of ").append(numNodes).append(NEW_LINE);
-        result.append("   (").append(stats.numNodes).append(" nodes, ").append(stats.numLeaves).append(" leaves)").append(NEW_LINE);
+        result.append("   Free Node: ")
+                .append(firstFreeNode)
+                .append(" of ")
+                .append(numNodes)
+                .append(NEW_LINE);
+        result.append("   (")
+                .append(stats.numNodes)
+                .append(" nodes, ")
+                .append(stats.numLeaves)
+                .append(" leaves, ")
+                .append(stats.numVisible)
+                .append(" visible)")
+                .append(NEW_LINE);
         boolean elided = false;
         int num = Math.min(numNodes, 64);
         for (int idx=0; idx<num; ++idx){
@@ -601,7 +670,9 @@ public class NodePool {
                 }
             }
         }
-        result.append("...").append(NEW_LINE);
+        if ((!elided) && (num < numNodes)) {
+            result.append("...").append(NEW_LINE);
+        }
         result.append("}");
 
         return result.toString();

@@ -22,6 +22,7 @@ class Node {
     private static final int CHILD_MASK         = 0x00FFFFFF;
     private static final int FLAG_LEAF_MASK     = 0x01000000;
     private static final int FLAG_USED_MASK     = 0x02000000;
+    private static final int FLAG_LOADED_MASK   = 0x04000000;
     private static final int DEPTH_MASK         = 0xF0000000;
 
     private static final byte CHILD_SHIFT   = 0;
@@ -70,7 +71,7 @@ class Node {
      * @return          True if the node is a leaf with no children
      */
     static boolean isLeaf(int node){
-        return (node & FLAG_LEAF_MASK) == FLAG_LEAF_MASK;
+        return (node & FLAG_LEAF_MASK) != 0;
     }
 
     /**
@@ -104,7 +105,44 @@ class Node {
      * @return          True if the node is in use
      */
     static boolean isUsed(int node){
-        return (node & FLAG_USED_MASK) == FLAG_USED_MASK;
+        return (node & FLAG_USED_MASK) != 0;
+    }
+
+    /**
+     * Sets/clears the boolean flag that indicates a node's child tile is loaded (or is a stub).
+     * A stub is a node (isParent True) where the children tile is not in the node pool.
+     *
+     * Loaded/Stub state is only relevant for non-leaf (parent) nodes.
+     * TODO: Enforce the parent prerequisite
+     *
+     * @param node    Node long to define the stub status of
+     * @param loaded  True if the node is loaded (is not a stub)
+     * @return
+     */
+    static int setLoaded(int node, boolean loaded) {
+        if (loaded) {
+            return (node | FLAG_LOADED_MASK);
+        }
+        return (node & ~FLAG_LOADED_MASK);
+    }
+
+    /**
+     * Determines if the given node has its children loaded (or not)
+     *
+     * @param node      Node long to test the loaded status of
+     * @return          True if the node's children are loaded
+     */
+    static boolean isLoaded(int node) {
+        return (node & FLAG_LOADED_MASK) != 0;
+    }
+
+    /**
+     * Determins if the given node is a stub (or is loaded).
+     * @param node      Node long to test the stub status of
+     * @return          True if the node's children are not loaded
+     */
+    static boolean isStub(int node) {
+        return (node & FLAG_LOADED_MASK) == 0;
     }
 
     /**
