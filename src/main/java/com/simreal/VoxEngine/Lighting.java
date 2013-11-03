@@ -79,7 +79,7 @@ public class Lighting {
         red += 0x40 * ks;
         green += 0xC0 * ks;
         blue += 0xC0 * ks;
-        if (ks > 0.0) alpha += 255.0 * ks;
+//        if (ks > 0.0) alpha += 255.0 * ks;
 
         // --------------------------------------
         // Clamp colors and alpha
@@ -87,7 +87,7 @@ public class Lighting {
         red = Math.max(0, Math.min(255, red));
         green = Math.max(0, Math.min(255, green));
         blue = Math.max(0, Math.min(255, blue));
-        alpha = Math.min(255, alpha);
+//        alpha = Math.min(255, alpha);
 
         return Material.setMaterial(red, green, blue, alpha, albedo, reflect);
     }

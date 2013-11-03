@@ -284,12 +284,12 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
 
                 // Save the current brick
                 case KeyEvent.VK_S:
-                    storage.putBrick(factory.name(), tree.nodePool().compress(), factory);
+                    storage.putBrick(factory.name(), tree.tilePool().compress(), factory);
                     break;
 
                 // Load into the current brick
                 case KeyEvent.VK_L:
-                    storage.getBrick(factory.name(), tree.nodePool(), factory);
+                    storage.getBrick(factory.name(), tree.tilePool(), factory);
                     break;
             }
 

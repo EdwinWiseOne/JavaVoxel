@@ -69,7 +69,7 @@ public class Database {
         }
     }
 
-    public void putBrick(String name, NodePool brick, BrickFactory factory) {
+    public void putBrick(String name, TilePool brick, BrickFactory factory) {
 
 
         // Construct a put object with the row key
@@ -89,7 +89,7 @@ public class Database {
         }
     }
 
-    public void getBrick(String name, NodePool brick, BrickFactory factory) {
+    public void getBrick(String name, TilePool brick, BrickFactory factory) {
         Get get = new Get(Bytes.toBytes(name))
                     .addColumn(CF_NODE_BYTES, C_BRICK_BYTES)
                     .addColumn(CF_NODE_BYTES, C_CONFIG_BYTES);

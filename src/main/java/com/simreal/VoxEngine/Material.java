@@ -137,6 +137,12 @@ public class Material {
                 | ((long)(reflectance & MATERIAL_BYTE_MASK) << MATERIAL_REFLECT_SHIFT);
     }
 
+    public static long scaleAlpha(long material, double scale) {
+        int alpha = (int)((material & MATERIAL_ALPHA_MASK) >>> MATERIAL_ALPHA_SHIFT);
+        alpha = Math.max(0, Math.min(255, (int)(alpha*scale)));
+        return ((material & ~MATERIAL_ALPHA_MASK) | ((long)alpha << MATERIAL_ALPHA_SHIFT));
+    }
+
     /**
      * Sets all of the components in a material long, specifying the color components
      * via a AWT Color parameter.
