@@ -15,8 +15,6 @@ import java.awt.image.DataBufferInt;
 
 public class BrickEditor extends Canvas implements Runnable {
 
-
-    // TODO: Relevant constants in a configuration file / object
     // --------------------------------------
     // View definition, controlling the pixels that get calculated (versus rendered)
     // --------------------------------------
@@ -247,8 +245,6 @@ public class BrickEditor extends Canvas implements Runnable {
     /**
      * Raycast into the VoxTree to generate a pixel image that represents what
      * we see from this specific viewpoint.
-     *
-     * TODO: Lighting model, etc
      *
      * @return  BufferedImage object suitable for framing.  Or rendering to the canvas.
      */

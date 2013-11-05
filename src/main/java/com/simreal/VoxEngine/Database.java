@@ -10,7 +10,6 @@ import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
 
 // RUNNING HBASE:
-// TODO: Manage local hbase via system calls?
 //
 // ./hbase-0.94.12/bin/start-hbase.sh
 //
@@ -55,10 +54,6 @@ public class Database {
     }
 
     private Database() {
-        // TODO: Run database connection in a background thread
-        // TODO: Determine if database is alive before doing the heavyweight startup?
-        // TODO: Early exit for dead database?
-
 
         Configuration conf = HBaseConfiguration.create();
         conf.set("hbase.zookeeper.quorum", "localhost");
@@ -69,7 +64,7 @@ public class Database {
         }
     }
 
-    public void putBrick(String name, NodePool brick, BrickFactory factory) {
+    public void putBrick(String name, TilePool brick, BrickFactory factory) {
 
 
         // Construct a put object with the row key
@@ -89,7 +84,7 @@ public class Database {
         }
     }
 
-    public void getBrick(String name, NodePool brick, BrickFactory factory) {
+    public void getBrick(String name, TilePool brick, BrickFactory factory) {
         Get get = new Get(Bytes.toBytes(name))
                     .addColumn(CF_NODE_BYTES, C_BRICK_BYTES)
                     .addColumn(CF_NODE_BYTES, C_CONFIG_BYTES);

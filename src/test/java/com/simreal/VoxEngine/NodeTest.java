@@ -44,8 +44,8 @@ public class NodeTest {
 
     @Test(dataProvider = "children")
     public void nodeChildTest(int node, int child) {
-        node = Node.setChild(node, child);
-        Assert.assertEquals(Node.child(node), child&0xFFFFFF);
+        node = Node.setTile(node, child);
+        Assert.assertEquals(Node.tile(node), child&0xFFFFFF);
     }
 
     @Test(dataProvider = "leaf")
@@ -61,17 +61,18 @@ public class NodeTest {
         Assert.assertEquals(Node.depth(node), depth & 0x0F);
     }
 
+
     @Test
     public void nodeStringTest() {
-        int node = Node.setChild(0, 7);
+        int node = Node.setTile(0, 7);
         node = Node.setLeaf(node, true);
         node = Node.setDepth(node, (byte)8);
 
         String str = Node.toString(node);
-        Assert.assertEquals(str, "LEAF { Depth: 8, Child: 7 }");
+        Assert.assertEquals(str, "LEAF { Depth: 8, STUB }");
 
         node = Node.setLeaf(node, false);
         str = Node.toString(node);
-        Assert.assertEquals(str, "NODE { Depth: 8, Child: 7 }");
+        Assert.assertEquals(str, "NODE { Depth: 8, STUB }");
     }
 }

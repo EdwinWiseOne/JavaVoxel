@@ -41,8 +41,6 @@ import java.io.StringWriter;
  * Ctrl-Shift-R     Toggle the square flag
  * Ctrl-I           Toggle the inversion flag
  *
- * TODO: a better method of selecting bricks, FAR MORE bricks
- * TODO: Make better textures and colors; these are for testing
  * Ctrl-0           Select brick pattern 0, test
  * Ctrl-1           Select brick pattern 1, coal
  * Ctrl-2           Select brick pattern 2, stone
@@ -268,9 +266,7 @@ public class BrickFactory {
     /**
      * Serialize the factory texture parameters into a JSON object
      *
-     * TODO: Convert to Jackson automatic processing
-     * TODO: Name of the brick?
-     *
+
      * @return  The JSON string representing the factory parameters
      */
     public String serializeJSON() {
@@ -533,8 +529,9 @@ public class BrickFactory {
         for (int x=0; x<tree.breadth(); ++x){
             for (int y=0; y<tree.breadth(); ++y){
                 for (int z=0; z<tree.breadth(); ++z) {
+
                     newTree.setVoxelPoint(new Point3i((x*stride)+offset, (y*stride)+offset, (z*stride)+offset),
-                            Material.setMaterial(255, 64, 64, 192, 128, 255));
+                            Material.setMaterial(255, 64, 64, 8, 128, 255));
 //                            Material.setMaterial(0x34, 0x1c, 0x02, 0xff, 128, 32));       // Dark brown
 //                            Material.setMaterial(0xe6, 0xda, 0xa6, 0xFF, 128, 32));         // Yellowish
 //                            Material.setMaterial(0x96, 0x4b, 0x00, 0xff, 128, 192));         // Med brown
@@ -547,7 +544,7 @@ public class BrickFactory {
             }
         }
 
-        tree.setPool(newTree.nodePool());
+        tree.setPool(newTree.tilePool());
     }
 
     public void Coal(VoxTree tree, Texture texture) {
@@ -572,7 +569,7 @@ public class BrickFactory {
             }
         }
 
-        tree.setPool(newTree.nodePool());
+        tree.setPool(newTree.tilePool());
     }
 
     public void Stone(VoxTree tree, Texture texture) {
@@ -602,7 +599,7 @@ public class BrickFactory {
             }
         }
 
-        tree.setPool(newTree.nodePool());
+        tree.setPool(newTree.tilePool());
     }
 
     public void Dirt(VoxTree tree, Texture texture) {
@@ -637,7 +634,7 @@ public class BrickFactory {
             }
         }
 
-        tree.setPool(newTree.nodePool());
+        tree.setPool(newTree.tilePool());
     }
 
     public void Steel(VoxTree tree, Texture texture) {
@@ -669,7 +666,7 @@ public class BrickFactory {
             }
         }
 
-        tree.setPool(newTree.nodePool());
+        tree.setPool(newTree.tilePool());
     }
 
 }

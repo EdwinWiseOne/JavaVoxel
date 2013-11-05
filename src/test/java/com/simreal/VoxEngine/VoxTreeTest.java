@@ -22,9 +22,9 @@ public class VoxTreeTest {
         Assert.assertEquals(tree.edgeLength, (1<<DEPTH) * VoxTree.BRICK_EDGE);
         Assert.assertEquals(tree.stride(), VoxTree.BRICK_EDGE);
 
-        NodePool.Statistics stats = tree.nodePool.analyze(0);
+        TilePool.Statistics stats = tree.tilePool.analyze(0);
         Assert.assertEquals(stats.numLeaves, 1);
-        Assert.assertEquals(stats.numNodes, 0);
+        Assert.assertEquals(stats.numTiles, 0);
     }
 
     @DataProvider(name = "insertion")
@@ -80,9 +80,9 @@ System.out.println(tree);
 
             int leaves = (Integer)row[3];
             int nodes = (Integer)row[4];
-            NodePool.Statistics stats = tree.nodePool.analyze(0);
+            TilePool.Statistics stats = tree.tilePool.analyze(0);
             Assert.assertEquals(stats.numLeaves, leaves);
-            Assert.assertEquals(stats.numNodes, nodes);
+            Assert.assertEquals(stats.numTiles, nodes);
         }
     }
 }

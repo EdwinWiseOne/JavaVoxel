@@ -169,7 +169,6 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
     @Override
     public void run() {
 
-        // TODO: Shut down thread in an orderly manner, running=false somewhere. Capture shutdown signal, etc?
         running = true;
 
         while (running){
@@ -204,7 +203,6 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
                 // --------------------------------------
                 // Collision test: If the viewpoint goes into a voxel, bounce it back to where it was
                 // --------------------------------------
-                // TODO: Incorporate movement momentum, so the bounce actually bounces
                 Point3i voxPoint = new Point3i((int)viewPoint.x, (int)viewPoint.y, (int)viewPoint.z);
                 if (tree.testVoxelPoint(voxPoint) != 0L) {
                     viewPoint.set(prevPoint);
@@ -284,12 +282,12 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
 
                 // Save the current brick
                 case KeyEvent.VK_S:
-                    storage.putBrick(factory.name(), tree.nodePool().compress(), factory);
+                    storage.putBrick(factory.name(), tree.tilePool().compress(), factory);
                     break;
 
                 // Load into the current brick
                 case KeyEvent.VK_L:
-                    storage.getBrick(factory.name(), tree.nodePool(), factory);
+                    storage.getBrick(factory.name(), tree.tilePool(), factory);
                     break;
             }
 
