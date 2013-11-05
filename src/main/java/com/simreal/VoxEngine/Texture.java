@@ -1,6 +1,9 @@
 package com.simreal.VoxEngine;
 
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Texture generation, based on Perlin noise, founded on SimplexNoise as implemented by
  * http://webstaff.itn.liu.se/~stegu/simplexnoise/SimplexNoise.java.
@@ -18,6 +21,9 @@ package com.simreal.VoxEngine;
  * to [0..255] via the toByte function.
  */
 public class Texture {
+
+    static final Logger LOG = LoggerFactory.getLogger(Texture.class.getName());
+
     // --------------------------------------
     // Texture transform control flags
     // --------------------------------------

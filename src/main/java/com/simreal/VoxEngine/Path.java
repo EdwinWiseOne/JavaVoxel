@@ -2,6 +2,9 @@ package com.simreal.VoxEngine;
 
 
 import com.simreal.VoxEngine.annotations.Stateless;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.vecmath.Point3i;
 
 import java.util.Formatter;
@@ -35,6 +38,9 @@ import java.util.Formatter;
  */
 @Stateless
 public class Path {
+
+    static final Logger LOG = LoggerFactory.getLogger(Path.class.getName());
+
     /** Maximum path length */
     public static final int PATH_MAX_LENGTH = 19;
 

@@ -1,9 +1,14 @@
 package com.simreal.VoxEngine;
 
 import com.simreal.VoxEngine.annotations.Stateless;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Stateless
 class Node {
+
+    static final Logger LOG = LoggerFactory.getLogger(Node.class.getName());
+
     /**
      * A Node is an entry in a Sparse Voxel Octree (SVO), which is aware of its
      * depth in the tree, has a pointer to its children tile (which holds all eight

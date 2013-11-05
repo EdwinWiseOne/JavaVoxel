@@ -8,6 +8,8 @@ import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.JsonParser;
 import org.codehaus.jackson.JsonToken;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.vecmath.Point3i;
 import java.awt.event.KeyEvent;
@@ -55,6 +57,8 @@ import java.io.StringWriter;
  *
  */
 public class BrickFactory {
+
+    static final Logger LOG = LoggerFactory.getLogger(VoxTree.class.getName());
 
     private static BrickFactory _brickFactoryInstance;
 
@@ -248,15 +252,18 @@ public class BrickFactory {
         if (square) texture.transform |= Texture.SQUARE;
 
         // Log the parameters so we can see what we are doing
-        System.out.println("BRICK # " + typeIdx +
-                " inputScale: " + (scaleIdx == 0 ? "OFF" : texture.inputScale) +
-                ", band: " + (bandIdx == 0 ? "OFF" : texture.band) +
-                ", curlScale: " + (decayIdx == 0 ? "OFF" : texture.curlScale) +
-                ", quant: " + (quantIdx == 0 ? "OFF" : texture.quantNum) +
-                ", invert " + invert +
-                ", reflect " + reflect +
-                ", square " + square );
-
+        LOG.info("BRICK # {} inputScale: {}, band: {}, curlScale {}, quant: {}, invert {}, reflect {}, square {}",
+                new Object[] {
+                    typeIdx,
+                    (scaleIdx == 0 ? "OFF" : texture.inputScale),
+                    (bandIdx == 0 ? "OFF" : texture.band),
+                    (decayIdx == 0 ? "OFF" : texture.curlScale),
+                    (quantIdx == 0 ? "OFF" : texture.quantNum),
+                    invert,
+                    reflect,
+                    square
+                }
+        );
         // --------------------------------------
         // Build the brick
         // --------------------------------------
@@ -287,7 +294,7 @@ public class BrickFactory {
 
             gen.close();
         } catch (Exception e) {
-            System.out.println(e);
+            LOG.error(e.toString());
         }
         return output.toString();
 
@@ -340,7 +347,7 @@ public class BrickFactory {
             return;
 
         } catch (Exception e) {
-            System.out.println(e);
+            LOG.error(e.toString());
         }
     }
 
@@ -364,7 +371,7 @@ public class BrickFactory {
             output.write(Bytes.toBytes(texture.curlScale));
 
         } catch (Exception e) {
-            System.out.println(e);
+            LOG.error(e.toString());
         }
 
         return output.toByteArray();
@@ -406,7 +413,7 @@ public class BrickFactory {
             texture.curlScale = Bytes.toDouble(buf);
 
         } catch (Exception e) {
-            System.out.println(e);
+            LOG.error(e.toString());
         }
     }
 

@@ -1,6 +1,8 @@
 package com.simreal.VoxEngine;
 
 import com.simreal.VoxEngine.brick.BrickFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.vecmath.Point3d;
 import javax.vecmath.Point3i;
@@ -15,6 +17,9 @@ import java.util.Random;
  * in a flat array form.
  */
 public class VoxTree {
+
+    static final Logger LOG = LoggerFactory.getLogger(VoxTree.class.getName());
+
     /**
      * Raycasting State used to traverse the voxel oct tree
      */
@@ -272,7 +277,7 @@ public class VoxTree {
     public void setVoxelPath(long path, long material) {
 
         if (Path.length(path) != depth) {
-            System.out.println("ERROR: Can not set voxel at depth " + Path.length(path) + " for a tree of depth " + depth);
+            LOG.error("Can not set voxel at depth {} for a tree of depth {}", Path.length(path), depth);
             return;
         }
 
@@ -714,7 +719,7 @@ public class VoxTree {
 
                 if (tmin <= PICK_DEPTH) {
                     // Close enough to pick, so do the split
-                    System.out.println("SPLIT " + state.nodeIndex);
+                    LOG.info("SPLIT {}", state.nodeIndex);
                     node = splitVoxel(state.nodeIndex);
                }
             }
@@ -869,7 +874,7 @@ public class VoxTree {
                 newState.nodeIndex = tilePool.getNodeInTileIdx(Node.tile(node), octantUnMirrored);
                 newState.tilePath = Path.addChild(state.tilePath, octantUnMirrored);
                 if (stateStackTop > depth) {
-                    System.out.println("STATE STACK OVERFLOW");
+                    LOG.error("STATE STACK OVERFLOW");
                     return material;
                 }
 

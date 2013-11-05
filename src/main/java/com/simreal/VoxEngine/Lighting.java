@@ -1,6 +1,9 @@
 package com.simreal.VoxEngine;
 
 import com.simreal.VoxEngine.annotations.Stateless;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.vecmath.Vector3d;
 
 
@@ -11,6 +14,8 @@ import javax.vecmath.Vector3d;
  */
 @Stateless
 public class Lighting {
+
+    static final Logger LOG = LoggerFactory.getLogger(Lighting.class.getName());
 
     private static Lighting _lightingInstance = null;
 

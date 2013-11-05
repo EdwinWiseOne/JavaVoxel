@@ -26,6 +26,7 @@
         <jackson.version>1.9.13</jackson.version>
         <smile.version>2.1.1</smile.version>
         <guava.version>12.0</guava.version>
+        <logback.version>1.0.13</logback.version>
 
     </properties>
 
@@ -82,5 +83,17 @@
             <artifactId>guava</artifactId>
             <version>${guava.version}</version>
         </dependency>
+        <!-- Logback Logging -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-core</artifactId>
+            <version>${logback.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>${logback.version}</version>
+        </dependency>
     </dependencies>
+
 </project>

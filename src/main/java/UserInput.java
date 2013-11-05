@@ -3,6 +3,8 @@ import com.simreal.VoxEngine.Material;
 import com.simreal.VoxEngine.Path;
 import com.simreal.VoxEngine.VoxTree;
 import com.simreal.VoxEngine.brick.BrickFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.JColorChooser;
 import javax.swing.JFrame;
@@ -48,6 +50,8 @@ import java.awt.event.MouseMotionListener;
  * Mouse Move   Change Heading
  */
 public class UserInput implements Runnable, KeyListener, MouseListener, MouseMotionListener {
+
+    static final Logger LOG = LoggerFactory.getLogger(UserInput.class.getName());
 
     // --------------------------------------
     // Singleton instance

@@ -2,6 +2,8 @@ package com.simreal.VoxEngine;
 
 
 import com.simreal.VoxEngine.annotations.Stateless;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Formatter;
 
@@ -27,6 +29,9 @@ import java.util.Formatter;
  */
 @Stateless
 public class Material {
+
+    static final Logger LOG = LoggerFactory.getLogger(Material.class.getName());
+
     private static final long MATERIAL_BLUE_MASK       = 0x00000000000000FFL;
     private static final long MATERIAL_GREEN_MASK      = 0x000000000000FF00L;
     private static final long MATERIAL_RED_MASK        = 0x0000000000FF0000L;

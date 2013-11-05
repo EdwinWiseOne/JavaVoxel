@@ -8,6 +8,8 @@ import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 // RUNNING HBASE:
 //
@@ -26,6 +28,8 @@ import org.apache.hadoop.hbase.util.Bytes;
  * Currently attaches to a local HBase instance, but this will change.
  */
 public class Database {
+
+    static final Logger LOG = LoggerFactory.getLogger(Database.class.getName());
 
     // --------------------------------------
     // Singleton instance
@@ -55,12 +59,14 @@ public class Database {
 
     private Database() {
 
+        LOG.info("Database constructor: localhost");
+
         Configuration conf = HBaseConfiguration.create();
         conf.set("hbase.zookeeper.quorum", "localhost");
         try {
             worldTable = new HTable(conf, T_WORLD);
         } catch (Exception e) {
-            System.out.println(e);
+            LOG.error(e.toString());
         }
     }
 
@@ -80,7 +86,7 @@ public class Database {
             worldTable.flushCommits();
 
         } catch (Exception e) {
-            System.out.println(e);
+            LOG.error(e.toString());
         }
     }
 
@@ -96,7 +102,7 @@ public class Database {
             factory.deserializeBytes(result.getValue(CF_NODE_BYTES, C_CONFIG_BYTES));
 
         } catch (Exception e) {
-            System.out.println(e);
+            LOG.error(e.toString());
         }
     }
 }

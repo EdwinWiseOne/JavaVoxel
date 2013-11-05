@@ -2,6 +2,8 @@ import com.simreal.VoxEngine.Database;
 import com.simreal.VoxEngine.Material;
 import com.simreal.VoxEngine.VoxTree;
 import com.simreal.VoxEngine.brick.BrickFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.JFrame;
 import javax.vecmath.Point3d;
@@ -14,6 +16,8 @@ import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 
 public class BrickEditor extends Canvas implements Runnable {
+
+    static final Logger LOG = LoggerFactory.getLogger(BrickEditor.class.getName());
 
     // --------------------------------------
     // View definition, controlling the pixels that get calculated (versus rendered)
@@ -183,7 +187,7 @@ public class BrickEditor extends Canvas implements Runnable {
             long currentTime = System.currentTimeMillis();
             if ((currentTime - baseTime) > TEN_SECONDS){
                 baseTime += TEN_SECONDS;
-                System.out.println("Frames/Second: " + frameCount/10);
+                LOG.info("Frames/Second: {}", frameCount/10);
                 frameCount = 0;
             }
         }
