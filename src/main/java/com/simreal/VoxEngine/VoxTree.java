@@ -78,10 +78,6 @@ public class VoxTree {
     // --------------------------------------
     // Holds the actual data
     // --------------------------------------
-    static final int ROOT_NODE_INDEX = -1;
-    int rootNode;
-    long rootNodeMaterial;
-
     TilePool tilePool;
     BrickFactory factory;
     Lighting lighting;
@@ -136,15 +132,12 @@ public class VoxTree {
         this.breadth = 1 << depth;
         this.edgeLength = breadth * BRICK_EDGE;
         // TODO: Relevant constants in a configuration file / object
-        int tilePoolSize = 16 * 1024 >> 3;    // A million nodes, less that that in tiles.
+        int tilePoolSize = 1024 * 1024 >> 3;    // A million nodes, less that that in tiles.
 
         // --------------------------------------
         // Initialize the node pool
         // --------------------------------------
         tilePool = new TilePool(tilePoolSize);
-        // Root node
-        rootNode = Node.EMPTY_USED_NODE;
-        rootNodeMaterial = 0L;
 
         // --------------------------------------
         // Helper objects
@@ -187,7 +180,6 @@ public class VoxTree {
         // Misc
         // --------------------------------------
         rand = new Random();
-
     }
 
     /**
@@ -229,16 +221,12 @@ public class VoxTree {
      * Change the backing data of the tree with shiny new data.  Mostly sets
      * the pool and roots.
      *
-     * TODO: Revert back to NodePool parameter.
      * TODO: Check depths and other features
      *
-     * @param newTree  New backing data, from a load or BrickFactory process
+     * @param newPool  New backing data, from a load or BrickFactory process
      */
-    public void setPool(VoxTree newTree) {
-        // Root node continues to point to the first child
-        rootNode = newTree.rootNode;
-        rootNodeMaterial = newTree.rootNodeMaterial;
-        tilePool = newTree.tilePool;
+    public void setPool(TilePool newPool) {
+        tilePool = newPool;
     }
 
     /**
@@ -363,15 +351,9 @@ public class VoxTree {
         int node;
         long material;
 
-        // Exceptions are annoying, but I hate to burn a whole tile for the
-        // root node.
-        if (nodeIndex == ROOT_NODE_INDEX) {
-            node = rootNode;
-            material = rootNodeMaterial;
-        } else {
-            node = tilePool.node(nodeIndex);
-            material = tilePool.nodeMaterial(nodeIndex);
-        }
+        node = tilePool.node(nodeIndex);
+        material = tilePool.nodeMaterial(nodeIndex);
+
         int childNode = Node.setDepth(node, (byte)(Node.depth(node)+1));
 
         // --------------------------------------
@@ -384,12 +366,8 @@ public class VoxTree {
         // Link to the new tile
         // --------------------------------------
         node = Node.setTile(Node.setLeaf(node, false), tileIndex);
-        if (nodeIndex == ROOT_NODE_INDEX) {
-            rootNode = node;
-        } else {
-            tilePool.setNode(nodeIndex, node);
-            tilePool.setPath(tileIndex, Path.addChild(tilePool.tilePath(nodeIndex), tilePool.getChildForNodeIdx(nodeIndex)));
-        }
+        tilePool.setNode(nodeIndex, node);
+        tilePool.setPath(tileIndex, Path.addChild(tilePool.tilePath(nodeIndex), tilePool.getChildForNodeIdx(nodeIndex)));
 
         // --------------------------------------
         // Initialize the tile
@@ -442,11 +420,7 @@ public class VoxTree {
         int nodeIndex = getIndexForPath(path, true);
         int parentNode;
         int childTileIndex;
-        if (nodeIndex == ROOT_NODE_INDEX) {
-            parentNode = rootNode;
-        } else {
-            parentNode = tilePool.node(nodeIndex);
-        }
+        parentNode = tilePool.node(nodeIndex);
         childTileIndex = Node.tile(parentNode);
 
         // --------------------------------------
@@ -469,13 +443,8 @@ public class VoxTree {
         // If all children are the same color, coalesce into this parent (if we may)
         // --------------------------------------
         if (merge && allowMerge) {
-            if (nodeIndex == ROOT_NODE_INDEX) {
-                rootNode = Node.setLeaf(parentNode, true);
-                rootNodeMaterial = color;
-            } else {
-                tilePool.setNode(nodeIndex, Node.setLeaf(parentNode, true));
-                tilePool.setMaterial(nodeIndex, color);
-            }
+            tilePool.setNode(nodeIndex, Node.setLeaf(parentNode, true));
+            tilePool.setMaterial(nodeIndex, color);
 
             // --------------------------------------
             tilePool.putTileFree(childTileIndex);
@@ -506,12 +475,7 @@ public class VoxTree {
         // New material in the parent node
         long material = Material.setMaterial((int) (red >>> 3), (int) (green >>> 3), (int) (blue >>> 3),
                 (int) (alpha >>> 3), (int) (albedo >>> 3), (int) (reflectance >>> 3));
-        if (nodeIndex == ROOT_NODE_INDEX) {
-            rootNodeMaterial = material;
-        } else {
-            tilePool.setMaterial(nodeIndex, material);
-        }
-
+        tilePool.setMaterial(nodeIndex, material);
 
         // Didn't merge!
         return false;
@@ -531,17 +495,15 @@ public class VoxTree {
      */
     public int getIndexForPath(long path, boolean split) {
         // Cnt and depth of zero is root node
-        int node = rootNode;
-        int nodeIndex = ROOT_NODE_INDEX;
+        int node;
+        int nodeIndex = 0;
         int depth = Path.length(path);
 
         // --------------------------------------
         // Walk down the path...
         // --------------------------------------
         for (int cnt=0; cnt<depth; ++cnt) {
-            if (cnt > 0) {
-                node = tilePool.node(nodeIndex);
-            }
+            node = tilePool.node(nodeIndex);
 
             // --------------------------------------
             // Subdivide if we hit a leaf before the bottom?
@@ -721,7 +683,7 @@ public class VoxTree {
         state.t1 = t1;
         state.tM = tM1;
         state.tilePath = 0L;
-        state.nodeIndex = ROOT_NODE_INDEX;
+        state.nodeIndex = 0;
 
         int stateStackTop = 0;
         stateStack[stateStackTop++].set(state);
@@ -739,10 +701,8 @@ public class VoxTree {
             // --------------------------------------
             state.set(stateStack[--stateStackTop]);
             int node;
-            if (state.nodeIndex == ROOT_NODE_INDEX) {
-                node = rootNode;
-            } else {
-                node = tilePool.node(state.nodeIndex);
+            node = tilePool.node(state.nodeIndex);
+            if (state.nodeIndex > 0) {
                 tilePool.stamp(tilePool.getTileForNodeIdx(state.nodeIndex), timestamp);
             }
 
@@ -766,11 +726,7 @@ public class VoxTree {
                 // Hit a leaf so check its material
                 // --------------------------------------
                 long newMaterial;
-                if (state.nodeIndex == ROOT_NODE_INDEX) {
-                    newMaterial = rootNodeMaterial;
-                } else {
-                    newMaterial = tilePool.nodeMaterial(state.nodeIndex);
-                }
+                newMaterial = tilePool.nodeMaterial(state.nodeIndex);
                 if (newMaterial > 0) {
                     // Material isn't a void...
 
@@ -778,8 +734,6 @@ public class VoxTree {
                         // --------------------------------------
                         // If we are picking, try to pick it...
                         // --------------------------------------
-//                        int prevPickNodeIndex = pickNodeIndex;
-
                         boolean refine = false;
                         if (tmin > PICK_DEPTH) {
                             // Too far away, fail the pick

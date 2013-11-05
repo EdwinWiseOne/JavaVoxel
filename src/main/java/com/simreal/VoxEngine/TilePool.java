@@ -50,6 +50,10 @@ public class TilePool {
     // By Node ... dependent data structures that match tile layout
     // --------------------------------------
 
+    /** Root Node held specially */
+    private int rootNode;
+    private long rootNodeMaterial;
+
     /** Nodes: eight per tile */
     private int[] tileNodes;
     /** Materials */
@@ -64,6 +68,9 @@ public class TilePool {
 
     /** Marker for the child of the last node in the free node chain */
      public static final int END_OF_FREE_TILES = -1;
+
+    /** Root Node */
+    static final int ROOT_NODE_INDEX = -1;
 
     /** Tile Size because I hate magic numbers */
     public static final int TILE_SIZE = 8;
@@ -93,6 +100,7 @@ public class TilePool {
      * @param size      Size of the tile pool, fixed for the life of the pool
      */
     private void init(int size) {
+        System.out.println("init: Tile pool size " + size);
         free_count = 0;
 
         numTiles = size;
@@ -101,6 +109,9 @@ public class TilePool {
         // --------------------------------------
         // The backing arrays themselves
         // --------------------------------------
+        rootNode = Node.EMPTY_USED_NODE;
+        rootNodeMaterial = 0L;
+
         tileNodes = new int[numNodes];
         nodeMaterials = new long[numNodes];
 
@@ -191,7 +202,7 @@ public class TilePool {
      * @return            Index of the node within the tile.
      */
     public int getNodeInTileIdx(int tileIdx, int childNum) {
-        return (tileIdx << TILE_SHIFT) + childNum;
+        return (tileIdx << TILE_SHIFT) + childNum + 1;
     }
 
     /**
@@ -202,7 +213,7 @@ public class TilePool {
      * @return          Index to the tile the node is a part of
      */
     public int getTileForNodeIdx(int nodeIdx) {
-        return nodeIdx >> TILE_SHIFT;
+        return (nodeIdx - 1) >> TILE_SHIFT;
     }
 
     /**
@@ -212,7 +223,7 @@ public class TilePool {
      * @return          Child index into the tile the node is a part of
      */
     public int getChildForNodeIdx(int nodeIdx) {
-        return (nodeIdx & (TILE_SIZE-1));
+        return ((nodeIdx-1) & (TILE_SIZE-1));
     }
 
 
@@ -291,19 +302,23 @@ public class TilePool {
         audit(1);
     }
 
-    /**
+/*
+    */
+/**
      * Returns the node data of a given tile at a particular child in the tile.
      *
      * @param tileIdx       Tile index
      * @param child         Child number
      * @return              Node data
-     */
+     *//*
+
     public int tileNode(int tileIdx, int child) {
         if ((tileIdx < 0) || (tileIdx >= numTiles)) {
             throw new RuntimeException("TilePool tile index is out of bounds");
         }
         return tileNodes[(tileIdx << TILE_SHIFT) + child];
     }
+*/
     /**
      * Returns the node data at a given index in the pool
      *
@@ -314,7 +329,12 @@ public class TilePool {
     public int node(int nodeIdx)
         throws RuntimeException {
         if ((nodeIdx < 0) || (nodeIdx >= numNodes)) {
-            throw new RuntimeException("TilePool index out of bounds");
+            throw new RuntimeException("node: TilePool index " + nodeIdx + " out of bounds");
+        }
+
+        --nodeIdx;
+        if (nodeIdx == ROOT_NODE_INDEX) {
+            return rootNode;
         }
         return tileNodes[nodeIdx];
     }
@@ -330,7 +350,12 @@ public class TilePool {
             throws RuntimeException {
 
         if ((nodeIdx < 0) || (nodeIdx >= numNodes)) {
-            throw new RuntimeException("TilePool index out of bounds");
+            throw new RuntimeException("nodeMaterial: TilePool index " + nodeIdx + " out of bounds");
+        }
+
+        --nodeIdx;
+        if (nodeIdx == ROOT_NODE_INDEX) {
+            return rootNodeMaterial;
         }
         return nodeMaterials[nodeIdx];
     }
@@ -345,7 +370,7 @@ public class TilePool {
     public long tilePath(int tileIdx)
             throws RuntimeException {
         if ((tileIdx < 0) || (tileIdx >= numTiles)) {
-            throw new RuntimeException("TilePool index " + tileIdx + "out of bounds");
+            throw new RuntimeException("tilePath: TilePool index " + tileIdx + " out of bounds");
         }
         return tilePaths[tileIdx];
     }
@@ -369,8 +394,14 @@ public class TilePool {
             throw new RuntimeException("TilePool setNode given invalid node");
         }
 
-        tileNodes[nodeIdx] = node;
-        nodeMaterials[nodeIdx] = material;
+        --nodeIdx;
+        if (nodeIdx == ROOT_NODE_INDEX) {
+            rootNode = node;
+            rootNodeMaterial = material;
+        } else {
+            tileNodes[nodeIdx] = node;
+            nodeMaterials[nodeIdx] = material;
+        }
     }
 
     /**
@@ -390,7 +421,12 @@ public class TilePool {
             throw new RuntimeException("TilePool setNode invalid node");
         }
 
-        tileNodes[nodeIdx] = node;
+        --nodeIdx;
+        if (nodeIdx == ROOT_NODE_INDEX) {
+            rootNode = node;
+        } else {
+            tileNodes[nodeIdx] = node;
+        }
     }
 
     /**
@@ -407,7 +443,12 @@ public class TilePool {
             throw new RuntimeException("TilePool index out of bounds");
         }
 
-        nodeMaterials[nodeIdx] = material;
+        --nodeIdx;
+        if (nodeIdx == ROOT_NODE_INDEX) {
+            rootNodeMaterial = material;
+        } else {
+            nodeMaterials[nodeIdx] = material;
+        }
     }
 
     /**
@@ -438,7 +479,7 @@ public class TilePool {
             throws RuntimeException {
 
         if ((tileIdx < 0) || (tileIdx >= numTiles)) {
-            throw new RuntimeException("TilePool index out of bounds");
+            throw new RuntimeException("TilePool index " + tileIdx + " out of bounds");
         }
 
         tileUsage[tileIdx] = timestamp;
@@ -463,15 +504,19 @@ public class TilePool {
         // --------------------------------------
         TilePool newPool = new TilePool(stats.numTiles);
 
+        newPool.rootNode = rootNode;
+        newPool.rootNodeMaterial = rootNodeMaterial;
+
         // --------------------------------------
         // Recursively copy the children tiles (of 8 sub-tileNodes)
-        // to the new pool.  Assumes the zeroeth tile is the
-        // root tile
+        // to the new pool.
         // --------------------------------------
-        try {
-            copyTileSubtree(0, newPool);
-        } catch (Exception e) {
-            System.out.println(e);
+        if (Node.isParent(rootNode)) {
+            try {
+                copyTileSubtree(Node.tile(rootNode), newPool);
+            } catch (Exception e) {
+                System.out.println(e);
+            }
         }
 
         return newPool;
@@ -556,23 +601,22 @@ public class TilePool {
             gen.writeStartObject();
             gen.writeStringField("version", "1.0.0");
             gen.writeNumberField("size", numTiles);
-            gen.writeArrayFieldStart("tileNodes");
+            gen.writeNumberField("rootNode", rootNode);
+            gen.writeNumberField("rootNodeMaterial", rootNodeMaterial);
 
-            // To make more clean, would need to store pool as ByteBuffer (and cast to LongBuffer, etc)
+            gen.writeArrayFieldStart("tileNodes");
             for (int index=0; index<numNodes; ++index) {
                 gen.writeNumber(tileNodes[index]);
             }
             gen.writeEndArray();
 
             gen.writeArrayFieldStart("materials");
-            // To make more clean, would need to store pool as ByteBuffer (and cast to LongBuffer, etc)
             for (int index=0; index<numNodes; ++index) {
                 gen.writeNumber(nodeMaterials[index]);
             }
             gen.writeEndArray();
 
             gen.writeArrayFieldStart("paths");
-            // To make more clean, would need to store pool as ByteBuffer (and cast to LongBuffer, etc)
             for (int index=0; index<numTiles; ++index) {
                 gen.writeNumber(tilePaths[index]);
             }
@@ -615,6 +659,10 @@ public class TilePool {
                 } else if ("size".equals(fieldName)) {
                     numTiles = parse.getIntValue();
                     init(numTiles);
+                } else if ("rootNode".equals(fieldName)) {
+                    rootNode = parse.getIntValue();
+                } else if ("rootNodeMaterial".equals(fieldName)) {
+                    rootNodeMaterial = parse.getLongValue();
                 } else if (Arrays.asList("tileNodes", "materials", "paths").contains(fieldName)) {
                     if (numTiles == 0) {
                         throw new Exception("Serialized data has a zero pool size.");
@@ -659,6 +707,8 @@ public class TilePool {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
 
         output.write(Bytes.toBytes(numTiles), 0, Integer.SIZE/8);
+        output.write(Bytes.toBytes(rootNode), 0, Integer.SIZE/8);
+        output.write(Bytes.toBytes(rootNodeMaterial), 0, Long.SIZE/8);
 
         for (int val : tileNodes) {
             output.write(Bytes.toBytes(val), 0, Integer.SIZE/8);
@@ -693,6 +743,12 @@ public class TilePool {
         int sizeNodes = sizeTiles << TILE_SHIFT;
 
         init(sizeTiles);
+
+        input.read(buf, 0, Integer.SIZE/8);
+        rootNode = Bytes.toInt(buf);
+
+        input.read(buf, 0, Long.SIZE/8);
+        rootNodeMaterial = Bytes.toLong(buf);
 
         for (int cnt=0; cnt<sizeNodes; ++cnt) {
             input.read(buf, 0, Integer.SIZE/8);
@@ -777,6 +833,8 @@ public class TilePool {
 
     static int free_count = 0;
     boolean audit(int delta) {
+
+/*
         free_count += delta;
         if (free_count < 0) {
             return false;
@@ -793,8 +851,7 @@ public class TilePool {
             count_free = 1;
             tile_idx = firstFreeTileIdx;
             node_idx = getNodeInTileIdx(tile_idx, 0);
-            node = tileNodes[node_idx];
-            while (node != END_OF_FREE_TILES) {
+            while ((node = node(node_idx)) != END_OF_FREE_TILES) {
                 ++ count_free;
 
                 tile_idx = node;
@@ -805,13 +862,13 @@ public class TilePool {
                 if (count_free > numNodes) {
                     return false;
                 }
-                node = tileNodes[node_idx];
             }
         }
 
         if (count_free != free_count) {
             return false;
         }
+*/
 
         return true;
     }
@@ -843,6 +900,13 @@ public class TilePool {
                 .append(stats.numParents)
                 .append(" parents)")
                 .append(NEW_LINE);
+
+        result.append("root : ");
+        result.append(Node.toString(rootNode));
+        result.append(" - ");
+        result.append(Material.toString(rootNodeMaterial));
+        result.append(NEW_LINE);
+
         boolean elided = false;
         int num = Math.min(numTiles, 8);
         for (int tileIdx=0; tileIdx<num; ++tileIdx){

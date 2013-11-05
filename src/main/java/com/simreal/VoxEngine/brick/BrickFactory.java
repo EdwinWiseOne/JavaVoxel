@@ -548,7 +548,7 @@ public class BrickFactory {
             }
         }
 
-        tree.setPool(newTree);
+        tree.setPool(newTree.tilePool());
     }
 
     public void Coal(VoxTree tree, Texture texture) {
@@ -573,7 +573,7 @@ public class BrickFactory {
             }
         }
 
-        tree.setPool(newTree);
+        tree.setPool(newTree.tilePool());
     }
 
     public void Stone(VoxTree tree, Texture texture) {
@@ -603,7 +603,7 @@ public class BrickFactory {
             }
         }
 
-        tree.setPool(newTree);
+        tree.setPool(newTree.tilePool());
     }
 
     public void Dirt(VoxTree tree, Texture texture) {
@@ -638,7 +638,7 @@ public class BrickFactory {
             }
         }
 
-        tree.setPool(newTree);
+        tree.setPool(newTree.tilePool());
     }
 
     public void Steel(VoxTree tree, Texture texture) {
@@ -670,7 +670,7 @@ public class BrickFactory {
             }
         }
 
-        tree.setPool(newTree);
+        tree.setPool(newTree.tilePool());
     }
 
 }
