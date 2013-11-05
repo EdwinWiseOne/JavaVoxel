@@ -10,7 +10,6 @@ import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
 
 // RUNNING HBASE:
-// TODO: Manage local hbase via system calls?
 //
 // ./hbase-0.94.12/bin/start-hbase.sh
 //
@@ -55,10 +54,6 @@ public class Database {
     }
 
     private Database() {
-        // TODO: Run database connection in a background thread
-        // TODO: Determine if database is alive before doing the heavyweight startup?
-        // TODO: Early exit for dead database?
-
 
         Configuration conf = HBaseConfiguration.create();
         conf.set("hbase.zookeeper.quorum", "localhost");

@@ -12,8 +12,6 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.Arrays;
 
-// TODO: Store the root node in the TilePool outside of the tiles.  Normalize exceptional behavior around the root node.
-
 /**
  * The TilePool is the backing store for the {@link VoxTree}, holding all of the {@link Node} representations,
  * {@link Material} choices, and {@Path} identifiers in use.
@@ -285,7 +283,6 @@ public class TilePool {
             throw new RuntimeException("PUTTING BACK already freed tile " + tileIdx);
         }
 
-        // TODO: If children are nodes, recursively free their child tiles too
         int node;
         audit(0);
         for (int child=0; child<TILE_SIZE; ++child) {

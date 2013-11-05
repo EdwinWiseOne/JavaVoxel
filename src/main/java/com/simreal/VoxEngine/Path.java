@@ -35,8 +35,6 @@ import java.util.Formatter;
  */
 @Stateless
 public class Path {
-    // TODO: Create a path iterator
-
     /** Maximum path length */
     public static final int PATH_MAX_LENGTH = 19;
 
@@ -171,7 +169,6 @@ public class Path {
 
         // --------------------------------------
         // Check position against normalized tree extents.
-        // TODO: Allow the tree to reside somewhere other than 0,0,0
         // --------------------------------------
         if ( (position.x < 0)
                 || (position.y < 0)

@@ -41,8 +41,6 @@ import java.io.StringWriter;
  * Ctrl-Shift-R     Toggle the square flag
  * Ctrl-I           Toggle the inversion flag
  *
- * TODO: a better method of selecting bricks, FAR MORE bricks
- * TODO: Make better textures and colors; these are for testing
  * Ctrl-0           Select brick pattern 0, test
  * Ctrl-1           Select brick pattern 1, coal
  * Ctrl-2           Select brick pattern 2, stone
@@ -268,9 +266,7 @@ public class BrickFactory {
     /**
      * Serialize the factory texture parameters into a JSON object
      *
-     * TODO: Convert to Jackson automatic processing
-     * TODO: Name of the brick?
-     *
+
      * @return  The JSON string representing the factory parameters
      */
     public String serializeJSON() {

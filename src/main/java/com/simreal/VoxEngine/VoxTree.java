@@ -131,7 +131,7 @@ public class VoxTree {
         this.depth = depth;
         this.breadth = 1 << depth;
         this.edgeLength = breadth * BRICK_EDGE;
-        // TODO: Relevant constants in a configuration file / object
+
         int tilePoolSize = 1024 * 1024 >> 3;    // A million nodes, less that that in tiles.
 
         // --------------------------------------
@@ -148,7 +148,6 @@ public class VoxTree {
         // --------------------------------------
         // Define the world cube
         // --------------------------------------
-        // TODO: Support world cubes not at origin, or have a translation value available
         nearTopLeft = new Point3d(0, 0, 0);
         farBottomRight = new Point3d(edgeLength, edgeLength, edgeLength);
 
@@ -245,7 +244,7 @@ public class VoxTree {
             || (voxelPos.z < nearTopLeft.z)
             || (voxelPos.x > farBottomRight.x)
             || (voxelPos.y > farBottomRight.y)
-            || (voxelPos.z > farBottomRight.z) ){
+            || (voxelPos.z > farBottomRight.z) ) {
             return;
         }
         // --------------------------------------
@@ -372,7 +371,6 @@ public class VoxTree {
         // --------------------------------------
         // Initialize the tile
         // --------------------------------------
-        // TODO: getFreeTile variant that initializes the tile contents
         for (int child=0; child<TilePool.TILE_SIZE; ++child) {
             int childIndex = tilePool.getNodeInTileIdx(tileIndex, child);
 
@@ -792,11 +790,8 @@ public class VoxTree {
                         }
 
                         // Scale alpha based on the cube thickness being passed through
-                        double dt = Math.abs(tmax - tmin) / 16.0;
+                        double dt = Math.abs(tmax - tmin) / (double)BRICK_EDGE;
                         newMaterial = Material.scaleAlpha(newMaterial, dt);
-
-                        // TODO: Scale material alpha based on length of ray through material, varies by depth and angle
-                        // Scales 1.0 at 16 == BRICK_EDGE
 
                         // Light the new material and alphaBlend it with the accumulated material
                         material = Material.alphaBlend(material, lighting.BlinnPhongFixedLight(newMaterial, normal, light, view));

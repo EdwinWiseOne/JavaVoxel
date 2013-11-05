@@ -117,7 +117,6 @@ class Node {
      * A stub is a node (isParent True) where the children tile is not in the node pool.
      *
      * Loaded/Stub state is only relevant for non-leaf (parent) nodes.
-     * TODO: Enforce the parent prerequisite
      *
      * @param node    Node long to define the stub status of
      * @param loaded  True if the node is loaded (is not a stub)
@@ -153,8 +152,6 @@ class Node {
      * Sets the depth parameter in the node, saying where in the tree
      * the node resides.  Note that this is redundant with the path length
      * information associated with this node.
-     *
-     * TODO: Eliminate node depth as a value and use the path instead
      *
      * @param node
      * @param depth
