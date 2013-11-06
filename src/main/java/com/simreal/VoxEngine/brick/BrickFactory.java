@@ -526,7 +526,7 @@ public class BrickFactory {
 
 
     public void Test(VoxTree tree, Texture texture) {
-        VoxTree newTree = new VoxTree(tree.depth());
+        VoxTree newTree = new VoxTree(tree.depth(), tree.nearPlane(), tree.nearRadius());
 
         name = "test";
 
@@ -555,7 +555,7 @@ public class BrickFactory {
     }
 
     public void Coal(VoxTree tree, Texture texture) {
-        VoxTree newTree = new VoxTree(tree.depth());
+        VoxTree newTree = new VoxTree(tree.depth(), tree.nearPlane(), tree.nearRadius());
 
         name = "coal";
 
@@ -580,7 +580,7 @@ public class BrickFactory {
     }
 
     public void Stone(VoxTree tree, Texture texture) {
-        VoxTree newTree = new VoxTree(tree.depth());
+        VoxTree newTree = new VoxTree(tree.depth(), tree.nearPlane(), tree.nearRadius());
 
         name = "stone";
 
@@ -610,7 +610,7 @@ public class BrickFactory {
     }
 
     public void Dirt(VoxTree tree, Texture texture) {
-        VoxTree newTree = new VoxTree(tree.depth());
+        VoxTree newTree = new VoxTree(tree.depth(), tree.nearPlane(), tree.nearRadius());
 
         name = "dirt";
 
@@ -645,7 +645,7 @@ public class BrickFactory {
     }
 
     public void Steel(VoxTree tree, Texture texture) {
-        VoxTree newTree = new VoxTree(tree.depth());
+        VoxTree newTree = new VoxTree(tree.depth(), tree.nearPlane(), tree.nearRadius());
 
         name = "steel";
 

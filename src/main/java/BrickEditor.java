@@ -43,6 +43,17 @@ public class BrickEditor extends Canvas implements Runnable {
     /** Display canvas height */
     public static final int CANVAS_HEIGHT = HEIGHT*3;
 
+    public static final int CANVAS_DEPTH = DEPTH*3;
+
+    // --------------------------------------
+    // LOD parameters; in pixel terms not world?
+    // --------------------------------------
+    /** distance to the near plane */
+    private static final double distNear = (double)CANVAS_DEPTH;
+    /** radius of one pixel of the cast cone at the near plane */
+    private static final double pixelRadiusNear = 1.0 / (1.0 * Math.min(CANVAS_WIDTH, CANVAS_HEIGHT));
+
+
     // --------------------------------------
     // Viewpoint  TODO: better names
     // --------------------------------------
@@ -123,7 +134,7 @@ public class BrickEditor extends Canvas implements Runnable {
         // --------------------------------------
         // Voxel tree that holds the current subset of voxel data
         // --------------------------------------
-        tree = new VoxTree(TREE_DEPTH);
+        tree = new VoxTree(TREE_DEPTH, distNear, pixelRadiusNear);
         int stride = tree.stride();
         int offset = stride >> 1;
 

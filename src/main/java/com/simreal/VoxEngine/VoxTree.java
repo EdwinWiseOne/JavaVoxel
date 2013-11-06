@@ -101,6 +101,10 @@ public class VoxTree {
     private State[] stateStack;
     private State state;
     private State newState;
+    // LOD details
+    private double nearPlane;
+    private double nearRadius;
+    private double[] voxelRadii;
 
     // --------------------------------------
     // Pick data is public for easy access.  It isn't particularly critical, and is read-only outside of VoxTree
@@ -128,7 +132,7 @@ public class VoxTree {
      *
      * @param depth Number of levels in the tree
      */
-    public VoxTree(int depth){
+    public VoxTree(int depth, double nearPlane, double nearRadius){
 
         // --------------------------------------
         // Calculate the tree's vital dimensions
@@ -173,6 +177,17 @@ public class VoxTree {
         facet = 0;
 
         // --------------------------------------
+        // LOD details
+        // --------------------------------------
+        this.nearPlane = nearPlane;
+        this.nearRadius = nearRadius;
+
+        voxelRadii = new double[depth+1];
+        for (int d=0; d<=depth; ++d) {
+            voxelRadii[d] = Math.pow(0.5, d) * (1.0 / (double)BRICK_EDGE);
+        }
+
+        // --------------------------------------
         // Picking details
         // --------------------------------------
         pickNodePath = 0;
@@ -186,6 +201,13 @@ public class VoxTree {
         rand = new Random();
     }
 
+    public double nearPlane() {
+        return nearPlane;
+    }
+
+    public double nearRadius() {
+        return nearRadius;
+    }
     /**
      * @return Depth of the tree, how many layers deep it goes
      */
@@ -635,25 +657,6 @@ public class VoxTree {
                         Material.setMaterial(rand.nextInt(256), 0, 0, 255, 255, 32)));
     }
 
-    /*
-        Rendering cone cast for LOD
-
-        dn = distance to near plane
-        dp = distance of the ray cast beyond the near plane
-
-        rn = radius of the cast cone at the near plane (e.g. 1 pixel)
-        rp = (dp * rn) / dn
-
-        rn depends on the screen size S
-
-        rn = 1 / (2 * min(Swidth, Sheight))
-
-        radius of a voxel rv depends on the active depth D and brick resolution B
-
-        rv = (0.5 ^ D) * (1/B)
-
-        Step the children descent when rv < rp
-    */
 
     /**
      * Do the heavy lifting on the ray casting. Instead of recursion down the voxel oct tree, keeps the
@@ -691,8 +694,8 @@ public class VoxTree {
         int stateStackTop = 0;
         stateStack[stateStackTop++].set(state);
 
-        double tmin = Math.max(state.t0.x, Math.max(state.t0.y, state.t0.z));
-        double tmax = Math.min(state.t1.x, Math.min(state.t1.y, state.t1.z));
+        double tmin;
+        double tmax;
 
         // --------------------------------------
         // Process the state stack until it is empty
@@ -709,6 +712,9 @@ public class VoxTree {
                 tilePool.stamp(tilePool.getTileForNodeIdx(state.nodeIndex), timestamp);
             }
 
+            tmin = Math.max(state.t0.x, Math.max(state.t0.y, state.t0.z));
+            tmax = Math.min(state.t1.x, Math.min(state.t1.y, state.t1.z));
+
             // --------------------------------------
             // If picking, we must traverse to the very bottom of the tree
             // so split a leaf node that isn't at the bottom
@@ -724,7 +730,34 @@ public class VoxTree {
                }
             }
 
-            if (Node.isLeaf(node)) {
+
+    /*
+        Rendering cone cast for LOD
+
+        dn = distance to near plane
+        dp = distance of the ray cast beyond the near plane
+
+        rn = radius of the cast cone at the near plane (e.g. 1 pixel)
+        rn depends on the screen size S
+        rn = 1 / (2 * min(Swidth, Sheight))
+
+        rp = (dp * rn) / dn
+
+        radius of a voxel rv depends on the active depth D and brick resolution B
+
+        rv = (0.5 ^ D) * (1/B)
+
+        Stop the children descent when rv < rp
+    */
+
+            boolean evalNow = false;
+            if (!pick) {
+                double dist = tmin;
+                double distRadius = (dist * nearRadius) / nearPlane;
+                evalNow = (voxelRadii[Node.depth(node)] < distRadius);
+            }
+
+            if (evalNow || Node.isLeaf(node)) {
                 // --------------------------------------
                 // Hit a leaf so check its material
                 // --------------------------------------
