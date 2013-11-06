@@ -36,33 +36,23 @@ public class BrickEditor extends Canvas implements Runnable {
     private BufferedImage img;
 
     // --------------------------------------
-    // LOD parameters
-    // --------------------------------------
-    /** distance to the near plane */
-    private static final double distNear = (double)DEPTH;
-    /** radius of one pixel of the cast cone at the near plane */
-    private static final double pixelRadiusNear = 1.0 / (2.0 * Math.min(WIDTH, HEIGHT));
-
-    /*
-        Rendering cone cast for LOD
-
-        dp = distance of the ray cast beyond the near plane = (tmin - dn)
-
-        rp = (dp * rn) / dn
-
-        radius of a voxel rv depends on the active depth D and brick resolution B
-        rv = (0.5 ^ D) * (1/B)
-
-        Stop the children descent when rv < rp
-    */
-
-    // --------------------------------------
     // Canvas definition, the pixels that get rendered
     // --------------------------------------
     /** Display canvas width */
     public static final int CANVAS_WIDTH = WIDTH*3;
     /** Display canvas height */
     public static final int CANVAS_HEIGHT = HEIGHT*3;
+
+    public static final int CANVAS_DEPTH = DEPTH*3;
+
+    // --------------------------------------
+    // LOD parameters; in pixel terms not world?
+    // --------------------------------------
+    /** distance to the near plane */
+    private static final double distNear = (double)CANVAS_DEPTH;
+    /** radius of one pixel of the cast cone at the near plane */
+    private static final double pixelRadiusNear = 1.0 / (1.0 * Math.min(CANVAS_WIDTH, CANVAS_HEIGHT));
+
 
     // --------------------------------------
     // Viewpoint  TODO: better names

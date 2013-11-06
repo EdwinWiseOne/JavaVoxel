@@ -184,7 +184,7 @@ public class VoxTree {
 
         voxelRadii = new double[depth+1];
         for (int d=0; d<=depth; ++d) {
-            voxelRadii[d] = Math.pow(0.5, d) * (2.0 / (double)BRICK_EDGE);
+            voxelRadii[d] = Math.pow(0.5, d) * (1.0 / (double)BRICK_EDGE);
         }
 
         // --------------------------------------
@@ -752,7 +752,7 @@ public class VoxTree {
 
             boolean evalNow = false;
             if (!pick) {
-                double dist = tmin - nearPlane; // state.tM? other?
+                double dist = tmin;
                 double distRadius = (dist * nearRadius) / nearPlane;
                 evalNow = (voxelRadii[Node.depth(node)] < distRadius);
             }
