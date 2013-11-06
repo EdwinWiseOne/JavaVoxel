@@ -36,6 +36,27 @@ public class BrickEditor extends Canvas implements Runnable {
     private BufferedImage img;
 
     // --------------------------------------
+    // LOD parameters
+    // --------------------------------------
+    /** distance to the near plane */
+    private static final double distNear = (double)DEPTH;
+    /** radius of one pixel of the cast cone at the near plane */
+    private static final double pixelRadiusNear = 1.0 / (2.0 * Math.min(WIDTH, HEIGHT));
+
+    /*
+        Rendering cone cast for LOD
+
+        dp = distance of the ray cast beyond the near plane = (tmin - dn)
+
+        rp = (dp * rn) / dn
+
+        radius of a voxel rv depends on the active depth D and brick resolution B
+        rv = (0.5 ^ D) * (1/B)
+
+        Stop the children descent when rv < rp
+    */
+
+    // --------------------------------------
     // Canvas definition, the pixels that get rendered
     // --------------------------------------
     /** Display canvas width */
@@ -123,7 +144,7 @@ public class BrickEditor extends Canvas implements Runnable {
         // --------------------------------------
         // Voxel tree that holds the current subset of voxel data
         // --------------------------------------
-        tree = new VoxTree(TREE_DEPTH);
+        tree = new VoxTree(TREE_DEPTH, distNear, pixelRadiusNear);
         int stride = tree.stride();
         int offset = stride >> 1;
 
