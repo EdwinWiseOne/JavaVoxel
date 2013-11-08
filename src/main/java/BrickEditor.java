@@ -86,8 +86,13 @@ public class BrickEditor extends Canvas implements Runnable {
     // --------------------------------------
     // Brick data -- backing store, current brick tree, and generator
     // --------------------------------------
+    /** Backing store; database of entire universe indexed by path */
     private Database database;
-    private VoxTree tree;
+    /** Main in-memory model of the tree; manages edits, and loads from backing store database */
+    private VoxTree treeModel;
+    /** GPU minimal model of the visible tree */
+    private VoxTree treeView;
+    /** Brick generator */
     private BrickFactory factory;
 
     // --------------------------------------
@@ -132,24 +137,37 @@ public class BrickEditor extends Canvas implements Runnable {
         factory = BrickFactory.instance();
 
         // --------------------------------------
-        // Voxel tree that holds the current subset of voxel data
+        // Voxel tree that holds the current nearby (loaded) subset of voxel data
         // --------------------------------------
-        tree = new VoxTree(TREE_DEPTH, distNear, pixelRadiusNear);
-        int stride = tree.stride();
+        // TODO: Scale up the in-memory model
+        treeModel = new VoxTree(TREE_DEPTH, 1, distNear, pixelRadiusNear);
+
+        // --------------------------------------
+        // Voxel tree that holds the current visible subset of voxel data
+        // --------------------------------------
+        treeView = new VoxTree(TREE_DEPTH, 1, distNear, pixelRadiusNear);
+        int stride = treeView.stride();
         int offset = stride >> 1;
 
         // --------------------------------------
         // Black floor of the brick, a non-useful default model placeholder
         // --------------------------------------
-        for (int x=0; x<tree.breadth(); ++x){
-            for (int y=0; y<tree.breadth(); ++y){
-                tree.setVoxelPoint(
+        for (int x=0; x<treeModel.breadth(); ++x){
+            for (int y=0; y<treeModel.breadth(); ++y){
+                treeModel.setVoxelPoint(
                         new Point3i((x*stride)+offset,
                                 0,
                                 (y*stride)+offset),
                                 Material.setMaterial(0, 0, 0, 255, 128, 64));
             }
         }
+
+        // --------------------------------------
+        // Initialize the view tree with the root node, which is not a leaf normally
+        // --------------------------------------
+        treeView.seedTree(treeModel);
+//        treeView.tilePool().setNode(0, Node.setLoaded(treeModel.tilePool().node(0), false));
+//        treeView.tilePool().setMaterial(0, treeModel.tilePool().material(0));
     }
 
     /**
@@ -163,7 +181,7 @@ public class BrickEditor extends Canvas implements Runnable {
         Thread thread = new Thread(this, "UI");
         thread.start();
 
-        uiListeners = UserInput.instance(this, tree, database, factory);
+        uiListeners = UserInput.instance(this, treeView, database, factory);
 
         (new Thread(uiListeners)).start();
     }
@@ -279,7 +297,7 @@ public class BrickEditor extends Canvas implements Runnable {
         // --------------------------------------
         // Picking ray in the center of the canvas
         // --------------------------------------
-        tree.castRay(viewPoint, fwVec, scan, true);
+        treeView.castRay(viewPoint, fwVec, scan, true);
 
         // --------------------------------------
         // Scan the entire view canvas and cast a ray from the viewpoint through each canvas point
@@ -298,7 +316,7 @@ public class BrickEditor extends Canvas implements Runnable {
             facing.sub(at, viewPoint);
             facing.normalize();
 
-            pixels[i] = tree.castRay(viewPoint, facing, scan, false);
+            pixels[i] = treeView.castRay(viewPoint, facing, scan, false);
 
             at.sub(ltVec);  // Advance X position
         }

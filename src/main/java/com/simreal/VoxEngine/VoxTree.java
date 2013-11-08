@@ -132,7 +132,7 @@ public class VoxTree {
      *
      * @param depth Number of levels in the tree
      */
-    public VoxTree(int depth, double nearPlane, double nearRadius){
+    public VoxTree(int depth, int numBanks, double nearPlane, double nearRadius){
 
         // --------------------------------------
         // Calculate the tree's vital dimensions
@@ -141,7 +141,7 @@ public class VoxTree {
         this.breadth = 1 << depth;
         this.edgeLength = breadth * BRICK_EDGE;
 
-        int tilePoolSize = 1024 * 1024 >> 3;    // A million nodes, less that that in tiles.
+        int tilePoolSize = numBanks * 1024 * 1024 >> 3;    // A million nodes, less that that in tiles.
 
         // --------------------------------------
         // Initialize the node pool
@@ -199,6 +199,11 @@ public class VoxTree {
         // Misc
         // --------------------------------------
         rand = new Random();
+    }
+
+    public void seedTree(VoxTree seed) {
+        tilePool.setNode(0, Node.setLoaded(seed.tilePool.node(0), false));
+        tilePool.setMaterial(0, seed.tilePool.material(0));
     }
 
     public double nearPlane() {
@@ -731,24 +736,24 @@ public class VoxTree {
             }
 
 
-    /*
-        Rendering cone cast for LOD
+            /*
+            Rendering cone cast for LOD
 
-        dn = distance to near plane
-        dp = distance of the ray cast beyond the near plane
+            dn = distance to near plane
+            dp = distance of the ray cast beyond the near plane
 
-        rn = radius of the cast cone at the near plane (e.g. 1 pixel)
-        rn depends on the screen size S
-        rn = 1 / (2 * min(Swidth, Sheight))
+            rn = radius of the cast cone at the near plane (e.g. 1 pixel)
+            rn depends on the screen size S
+            rn = 1 / (2 * min(Swidth, Sheight))
 
-        rp = (dp * rn) / dn
+            rp = (dp * rn) / dn
 
-        radius of a voxel rv depends on the active depth D and brick resolution B
+            radius of a voxel rv depends on the active depth D and brick resolution B
 
-        rv = (0.5 ^ D) * (1/B)
+            rv = (0.5 ^ D) * (1/B)
 
-        Stop the children descent when rv < rp
-    */
+            Stop the children descent when rv < rp
+            */
 
             boolean evalNow = false;
             if (!pick) {

@@ -448,6 +448,20 @@ public class TilePool {
         }
     }
 
+    public long material(int nodeIdx)
+        throws RuntimeException {
+
+        if ((nodeIdx < 0) || (nodeIdx >= numNodes)) {
+            throw new RuntimeException("TilePool index out of bounds");
+        }
+
+        --nodeIdx;
+        if (nodeIdx == ROOT_NODE_INDEX) {
+            return rootNodeMaterial;
+        } else {
+            return nodeMaterials[nodeIdx];
+        }
+    }
     /**
      * Sets the {@link Path} data for the node at the given index in the pool
      *
