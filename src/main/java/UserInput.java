@@ -30,6 +30,7 @@ import java.awt.event.MouseMotionListener;
  *
  * Ctrl-*   BrickFactory commands
  *
+ * Alt-D    Debug dump of view
  * Alt-I    Color menu
  * Alt-S    Save current brick
  * Alt-L    Load into current brick
@@ -61,7 +62,8 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
 
     // Core properties
     private Canvas canvas;
-    private VoxTree tree;
+    private VoxTree view;
+    private VoxTree model;
     private Database storage;
     private BrickFactory factory;
 
@@ -100,11 +102,12 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
      * Singleton Factory
      *
      * @param canvas    Canvas we are drawing upon
-     * @param tree      VoxTree with rendering data
+     * @param view      VoxTree view for seeding
+     * @param model     VoxTree full model
      * @return          The one instance of UserInput (constructed during the first call)
      */
-    public static UserInput instance(Canvas canvas, VoxTree tree, Database storage, BrickFactory factory){
-        if (_userInputInstance == null) _userInputInstance = new UserInput(canvas, tree, storage, factory);
+    public static UserInput instance(Canvas canvas, VoxTree view, VoxTree model, Database storage, BrickFactory factory){
+        if (_userInputInstance == null) _userInputInstance = new UserInput(canvas, view, model, storage, factory);
 
         return _userInputInstance;
     }
@@ -113,15 +116,17 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
      * Private constructor, used by the getUI Factory.
      *
      * @param canvas    Canvas we are drawing upon
-     * @param tree      VoxTree with rendering data
+     * @param view      VoxTree view for seeding
+     * @param model     VoxTree full model
      * @param storage   Database backing store for load and save
      */
-    private UserInput(Canvas canvas, VoxTree tree, Database storage, BrickFactory factory){
+    private UserInput(Canvas canvas, VoxTree view, VoxTree model, Database storage, BrickFactory factory){
 
         // --------------------------------------
         // Current and long term backing data
         // --------------------------------------
-        this.tree = tree;
+        this.view = view;
+        this.model = model;
         this.storage = storage;
         this.factory = factory;
 
@@ -147,7 +152,7 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
         // --------------------------------------
         heading = Math.toRadians(90.0);
         elevation = Math.toRadians(-20.0);
-        int edgeLength = tree.edgeLength();
+        int edgeLength = model.edgeLength();
         viewPoint = new Point3d(edgeLength / 2.0, edgeLength * 1.5, -edgeLength * 3.0);
 
         fwVec = new Vector3d();
@@ -208,7 +213,7 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
                 // Collision test: If the viewpoint goes into a voxel, bounce it back to where it was
                 // --------------------------------------
                 Point3i voxPoint = new Point3i((int)viewPoint.x, (int)viewPoint.y, (int)viewPoint.z);
-                if (tree.testVoxelPoint(voxPoint) != 0L) {
+                if (view.testVoxelPoint(voxPoint) != 0L) {
                     viewPoint.set(prevPoint);
                 }
 
@@ -269,7 +274,9 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
             // --------------------------------------
             switch (key.getKeyCode()) {
                 default:
-                    factory.keyPressed(key, tree);
+                    if (factory.keyPressed(key, model)) {
+                        view.seedTree(model);
+                    }
                     break;
             }
         } else if (key.isAltDown()) {
@@ -277,6 +284,9 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
             // Alt keys (triggering commands)
             // --------------------------------------
             switch (key.getKeyCode()) {
+                case KeyEvent.VK_D:
+                    view.debugPrint("Manual Debug View");
+                    break;
                 // Inventory - just the material color at this point, with preset albedo and reflectance
                 case KeyEvent.VK_I:
                     JFrame guiFrame = new JFrame();
@@ -286,12 +296,12 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
 
                 // Save the current brick
                 case KeyEvent.VK_S:
-                    storage.putBrick(factory.name(), tree.tilePool().compress(), factory);
+                    storage.putBrick(factory.name(), model.tilePool().compress(), factory);
                     break;
 
                 // Load into the current brick
                 case KeyEvent.VK_L:
-                    storage.getBrick(factory.name(), tree.tilePool(), factory);
+                    storage.getBrick(factory.name(), model.tilePool(), factory);
                     break;
             }
 
@@ -409,7 +419,7 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
         // The Path holds the information about not only this node, but all parents to it, as
         // well as encoding the position of the voxel in world space.
         // --------------------------------------
-        long path = tree.pickNodePath;
+        long path = view.pickNodePath;
         if (path == 0L) return;
 
         if (mouse.getButton() == MouseEvent.BUTTON1){
@@ -418,22 +428,23 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
             // --------------------------------------
 
             // Get the world position that corresponds to this path...
-            Point3i center = Path.toPosition(tree.pickNodePath, tree.edgeLength());
+            Point3i center = Path.toPosition(view.pickNodePath, view.edgeLength());
             // ... and offset from the node in the direction of the selected facet of that node
-            switch (tree.pickFacet) {
+            switch (view.pickFacet) {
                 case VoxTree.XY_PLANE:
-                    center.add(new Point3i(0, 0, -(int)Math.copySign(tree.stride(), tree.pickRay.z)));
+                    center.add(new Point3i(0, 0, -(int)Math.copySign(view.stride(), view.pickRay.z)));
                     break;
                 case VoxTree.YZ_PLANE:
-                    center.add(new Point3i(-(int)Math.copySign(tree.stride(), tree.pickRay.x), 0, 0));
+                    center.add(new Point3i(-(int)Math.copySign(view.stride(), view.pickRay.x), 0, 0));
                     break;
                 case VoxTree.XZ_PLANE:
-                    center.add(new Point3i(0, -(int)Math.copySign(tree.stride(), tree.pickRay.y), 0));
+                    center.add(new Point3i(0, -(int)Math.copySign(view.stride(), view.pickRay.y), 0));
                     break;
             }
 
             // Now create a new leaf voxel in the empty space adjacent to that selected voxel facet
-            tree.setVoxelPoint(center, selectedMaterial);
+            view.setVoxelPoint(center, selectedMaterial);
+            // TODO: REFLECT VIEW CHANGES IN THE MODEL
 
         } else if (mouse.getButton() == MouseEvent.BUTTON3){
             // --------------------------------------
@@ -441,7 +452,8 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
             // --------------------------------------
 
             // Set the selected voxel to zero, which eliminates it (empty space)
-            tree.setVoxelPath(path, 0);
+            model.setVoxelPath(path, 0);
+            // TODO: REFLECT VIEW CHANGES IN THE MODEL
         }
 
     }

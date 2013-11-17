@@ -1,8 +1,6 @@
 package com.simreal.VoxEngine;
 
 import com.simreal.VoxEngine.brick.BrickFactory;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
@@ -61,6 +59,7 @@ public class Database {
 
         LOG.info("Database constructor: localhost");
 
+/*
         Configuration conf = HBaseConfiguration.create();
         conf.set("hbase.zookeeper.quorum", "localhost");
         try {
@@ -68,6 +67,7 @@ public class Database {
         } catch (Exception e) {
             LOG.error(e.toString());
         }
+*/
     }
 
     public void putBrick(String name, TilePool brick, BrickFactory factory) {

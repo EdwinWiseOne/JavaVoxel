@@ -20,7 +20,7 @@ import java.util.Formatter;
  * <pre>
  *  64              56              48              40              32
  *    +-------+-------+-------+-------+-------+-------+-------+-------+
- *    | (unused)                      | reflectance   | albedo        |
+ *    | Node Resp.    | (unused)      | reflectance   | albedo        |
  *    +-------+-------+-------+-------+-------+-------+-------+-------+
  *    | alpha         | red           | green         | blue          |
  *    +-------+-------+-------+-------+-------+-------+-------+-------+
@@ -32,23 +32,25 @@ public class Material {
 
     static final Logger LOG = LoggerFactory.getLogger(Material.class.getName());
 
-    private static final long MATERIAL_BLUE_MASK       = 0x00000000000000FFL;
-    private static final long MATERIAL_GREEN_MASK      = 0x000000000000FF00L;
-    private static final long MATERIAL_RED_MASK        = 0x0000000000FF0000L;
-    private static final long MATERIAL_ALPHA_MASK      = 0x00000000FF000000L;
-    private static final long MATERIAL_ALBEDO_MASK     = 0x000000FF00000000L;
-    private static final long MATERIAL_REFLECT_MASK    = 0x0000FF0000000000L;
-    private static final long MATERIAL_UNUSED_MASK     = 0xFFFF000000000000L;
+    private static final long BLUE_MASK     = 0x00000000000000FFL;
+    private static final long GREEN_MASK    = 0x000000000000FF00L;
+    private static final long RED_MASK      = 0x0000000000FF0000L;
+    private static final long ALPHA_MASK    = 0x00000000FF000000L;
+    private static final long ALBEDO_MASK   = 0x000000FF00000000L;
+    private static final long REFLECT_MASK  = 0x0000FF0000000000L;
+    private static final long UNUSED_MASK   = 0x00FF000000000000L;
+    private static final long NODE_MASK     = 0xFF00000000000000L;
 
-    private static final byte MATERIAL_BLUE_SHIFT      = 0;
-    private static final byte MATERIAL_GREEN_SHIFT     = 8;
-    private static final byte MATERIAL_RED_SHIFT       = 16;
-    private static final byte MATERIAL_ALPHA_SHIFT     = 24;
-    private static final byte MATERIAL_ALBEDO_SHIFT    = 32;
-    private static final byte MATERIAL_REFLECT_SHIFT   = 40;
-    private static final byte MATERIAL_UNUSED_SHIFT    = 48;
+    private static final byte BLUE_SHIFT    = 0;
+    private static final byte GREEN_SHIFT   = 8;
+    private static final byte RED_SHIFT     = 16;
+    private static final byte ALPHA_SHIFT   = 24;
+    private static final byte ALBEDO_SHIFT  = 32;
+    private static final byte REFLECT_SHIFT = 40;
+    private static final byte UNUSED_SHIFT  = 48;
+    private static final byte NODE_SHIFT    = 56;
 
-    private static final int MATERIAL_BYTE_MASK    = 0xFF;
+    private static final int BYTE_MASK      = 0xFF;
 
     /**
      * Gets the red color component of the material.
@@ -57,7 +59,7 @@ public class Material {
      * @return              Red component value in [0..255]
      */
     public static int red(long material){
-        return (int)((material & MATERIAL_RED_MASK) >>> MATERIAL_RED_SHIFT);
+        return (int)((material & RED_MASK) >>> RED_SHIFT);
     }
 
     /**
@@ -67,7 +69,7 @@ public class Material {
      * @return              Green component value in [0..255]
      */
     public static int green(long material){
-        return (int)((material & MATERIAL_GREEN_MASK) >>> MATERIAL_GREEN_SHIFT);
+        return (int)((material & GREEN_MASK) >>> GREEN_SHIFT);
     }
 
     /**
@@ -77,7 +79,7 @@ public class Material {
      * @return              Blue component value in [0..255]
      */
     public static int blue(long material){
-        return (int)((material & MATERIAL_BLUE_MASK) >>> MATERIAL_BLUE_SHIFT);
+        return (int)((material & BLUE_MASK) >>> BLUE_SHIFT);
     }
 
     /**
@@ -87,7 +89,7 @@ public class Material {
      * @return              Alpha transparency value in [0..255]
      */
     public static int alpha(long material){
-        return (int)((material & MATERIAL_ALPHA_MASK) >>> MATERIAL_ALPHA_SHIFT);
+        return (int)((material & ALPHA_MASK) >>> ALPHA_SHIFT);
     }
 
     /**
@@ -109,7 +111,7 @@ public class Material {
      * @return              Albedo component (diffuse light reflection factor) in [0..255]
      */
     public static int albedo(long material){
-        return (int)((material & MATERIAL_ALBEDO_MASK) >>> MATERIAL_ALBEDO_SHIFT);
+        return (int)((material & ALBEDO_MASK) >>> ALBEDO_SHIFT);
     }
 
     /**
@@ -119,7 +121,20 @@ public class Material {
      * @return              Reflectance component (specular light reflection factor) in [0..255]
      */
     public static int reflectance(long material){
-        return (int)((material & MATERIAL_REFLECT_MASK) >>> MATERIAL_REFLECT_SHIFT);
+        return (int)((material & REFLECT_MASK) >>> REFLECT_SHIFT);
+    }
+
+    public static int node(long material){
+        return (int)((material & NODE_MASK) >>> NODE_SHIFT);
+    }
+
+    public static long setNode(long material, int node){
+        return (material & ~NODE_MASK)
+                | ((long)node << NODE_SHIFT);
+    }
+
+    public static long clearNode(long material) {
+        return (material & ~NODE_MASK);
     }
 
     /**
@@ -134,18 +149,18 @@ public class Material {
      * @return                  Material long with all components set
      */
     public static long setMaterial(int red, int green, int blue, int alpha, int albedo, int reflectance){
-        return ((long)(red & MATERIAL_BYTE_MASK) << MATERIAL_RED_SHIFT)
-                | ((long)(green & MATERIAL_BYTE_MASK) << MATERIAL_GREEN_SHIFT)
-                | ((long)(blue & MATERIAL_BYTE_MASK) << MATERIAL_BLUE_SHIFT)
-                | ((long)(alpha & MATERIAL_BYTE_MASK) << MATERIAL_ALPHA_SHIFT)
-                | ((long)(albedo & MATERIAL_BYTE_MASK) << MATERIAL_ALBEDO_SHIFT)
-                | ((long)(reflectance & MATERIAL_BYTE_MASK) << MATERIAL_REFLECT_SHIFT);
+        return ((long)(red & BYTE_MASK) << RED_SHIFT)
+                | ((long)(green & BYTE_MASK) << GREEN_SHIFT)
+                | ((long)(blue & BYTE_MASK) << BLUE_SHIFT)
+                | ((long)(alpha & BYTE_MASK) << ALPHA_SHIFT)
+                | ((long)(albedo & BYTE_MASK) << ALBEDO_SHIFT)
+                | ((long)(reflectance & BYTE_MASK) << REFLECT_SHIFT);
     }
 
     public static long scaleAlpha(long material, double scale) {
-        int alpha = (int)((material & MATERIAL_ALPHA_MASK) >>> MATERIAL_ALPHA_SHIFT);
+        int alpha = (int)((material & ALPHA_MASK) >>> ALPHA_SHIFT);
         alpha = Math.max(0, Math.min(255, (int)(alpha*scale)));
-        return ((material & ~MATERIAL_ALPHA_MASK) | ((long)alpha << MATERIAL_ALPHA_SHIFT));
+        return ((material & ~ALPHA_MASK) | ((long)alpha << ALPHA_SHIFT));
     }
 
     /**
@@ -222,6 +237,10 @@ public class Material {
     static public String toString(long material){
         StringBuilder result = new StringBuilder();
         Formatter fmt = new Formatter();
+
+        if (Material.alpha(material) == 0) {
+            return "(void)";
+        }
 
         result.append("Material { ");
         fmt.format("R%02X, ", Material.red(material));

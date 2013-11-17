@@ -13,7 +13,7 @@ public class VoxTreeTest {
 
     @BeforeMethod
     private void initTree() {
-        tree = new VoxTree(DEPTH, 1, 1);
+        tree = new VoxTree(DEPTH, 1,    1, 1);
     }
 
     @Test

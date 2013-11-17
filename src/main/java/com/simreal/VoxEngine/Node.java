@@ -5,7 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Stateless
-class Node {
+public class Node {
 
     static final Logger LOG = LoggerFactory.getLogger(Node.class.getName());
 
@@ -25,6 +25,7 @@ class Node {
      * </pre>
      */
     private static final int TILE_MASK          = 0x00FFFFFF;
+    private static final int RESPONSE_MASK      = 0xFF000000;
     private static final int FLAG_PARENT_MASK   = 0x01000000;
     private static final int FLAG_USED_MASK     = 0x02000000;
     private static final int FLAG_LOADED_MASK   = 0x04000000;
@@ -33,8 +34,9 @@ class Node {
     public static final int EMPTY_USED_NODE     = 0x02000000;
     public static final int EMPTY_UNUSED_NODE   = 0x00000000;
 
-    private static final byte TILE_SHIFT    = 0;
-    private static final byte DEPTH_SHIFT   = 28;
+    private static final byte TILE_SHIFT        = 0;
+    private static final byte RESPONSE_SHIFT    = 24;
+    private static final byte DEPTH_SHIFT       = 28;
 
     /**
      * Sets the index of the tile that holds this node's children
@@ -140,7 +142,7 @@ class Node {
      * @param node      Node long to test the loaded status of
      * @return          True if the node's children are loaded
      */
-    static boolean isLoaded(int node) {
+    static public boolean isLoaded(int node) {
         return (node & FLAG_LOADED_MASK) != 0;
     }
 
@@ -177,6 +179,15 @@ class Node {
         return (byte)((node & DEPTH_MASK) >>> DEPTH_SHIFT);
     }
 
+    static int setNodeReponse(int node, int response){
+        return (node & ~RESPONSE_MASK)
+                | (response << RESPONSE_SHIFT);
+    }
+
+    static int nodeResponse(int node){
+        return (int)((node & RESPONSE_MASK) >>> RESPONSE_SHIFT);
+    }
+
     /**
      * Create a string representation of this node
      *
@@ -193,7 +204,9 @@ class Node {
         }
         result.append(" Depth: ").append(Node.depth(node));
         if (Node.isStub(node)) {
-            result.append(", STUB");
+            if (Node.isParent(node)) {
+                result.append(", STUB");
+            }
         } else {
             result.append(", Tile: ").append(Node.tile(node));
         }

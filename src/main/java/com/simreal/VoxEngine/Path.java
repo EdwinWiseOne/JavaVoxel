@@ -387,7 +387,7 @@ public class Path {
      * @param path  Path long to interpret
      * @return      String representation of the path
      */
-    static String toString(long path){
+    static public String toString(long path){
         StringBuilder result = new StringBuilder();
         Formatter fmt = new Formatter();
         String NEW_LINE = System.getProperty("line.separator");
@@ -395,7 +395,7 @@ public class Path {
         int depth = Path.length(path);
         result.append("Path { ");
         result.append("Depth: ").append(depth);
-        result.append(", Child [");
+        result.append(", [");
         for (int idx=0; idx<depth; ++idx) {
             if (idx > 0) { result.append(", "); }
             result.append(Path.child(path, idx));

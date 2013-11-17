@@ -5,6 +5,8 @@ import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.JsonParser;
 import org.codehaus.jackson.JsonToken;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -16,16 +18,18 @@ import java.util.Arrays;
  * The TilePool is the backing store for the {@link VoxTree}, holding all of the {@link Node} representations,
  * {@link Material} choices, and {@Path} identifiers in use.
  *
- * The TilePool is a fixed size and handles the distribution of free tileNodes, as well as accepting tileNodes that are
+ * The TilePool is a fixed size and handles the distribution of free nodes, as well as accepting nodes that are
  * no longer used back into the free node list.
  */
 public class TilePool {
 
+    static final Logger LOG = LoggerFactory.getLogger(TilePool.class.getName());
+
     // --------------------------------------
-    // By Tile ... one tile is eight tileNodes
+    // By Tile ... one tile is eight nodes
     // --------------------------------------
 
-    /** Total number of tiles in the pool, used and unused.  One tile is 8 tileNodes. */
+    /** Total number of tiles in the pool, used and unused.  One tile is 8 nodes. */
     private int numTiles;
     /** Total number of nodes in the pool, 8 times numTiles, a convenience variable */
     private int numNodes;
@@ -38,10 +42,14 @@ public class TilePool {
     private int[] tileUsage;
     /** LRU list */
     private int[] tileLRU;
+    /** Paths that we are requesting, from generateRequest */
+    private long[] requestPaths;
+    /** Indices from generateRequest */
+    private int[] tileRequestIndices;
 
     /** The most recently used timestamp */
     private int now;
-    /** The number of visible tileNodes in the LRU */
+    /** The number of visible nodes in the LRU */
     private int mruNum;
 
     // --------------------------------------
@@ -53,19 +61,25 @@ public class TilePool {
     private long rootNodeMaterial;
 
     /** Nodes: eight per tile */
-    private int[] tileNodes;
+    private int[] nodes;
     /** Materials */
     private long[] nodeMaterials;
+    /** Request List, which holds the scan # at the index of the node whose child we want to load */
+    private int[] nodeRequests;
+    /** Number of requests at the head of the nodeRequests, after compaction */
+    private int requestNum;
 
     // --------------------------------------
     // Free-Tile Link Markers
     // --------------------------------------
-
     /** Marker for the end of the node chain */
     public static final int NO_FREE_TILE_INDEX = -1;
-
     /** Marker for the child of the last node in the free node chain */
      public static final int END_OF_FREE_TILES = -1;
+    /** Marker for tile usage, for tiles not actually in use */
+    public static final int UNUSED_TILE = -1;
+    /** How many scans must pass before we free an unseen tile */
+    public static final int STALE_TILE_AGE = 3;
 
     /** Root Node */
     static final int ROOT_NODE_INDEX = -1;
@@ -77,9 +91,11 @@ public class TilePool {
      /**
      * Construct an empty, null tile pool
      */
+/*
     public TilePool() {
         numTiles = 0;
     }
+*/
 
     /**
      * Constuct a pool of the given size.
@@ -110,12 +126,14 @@ public class TilePool {
         rootNode = Node.EMPTY_USED_NODE;
         rootNodeMaterial = 0L;
 
-        tileNodes = new int[numNodes];
+        nodes = new int[numNodes];
+        nodeRequests = new int[numNodes];
         nodeMaterials = new long[numNodes];
 
         tilePaths = new long[numTiles];
         tileUsage = new int[numTiles];
         tileLRU = new int[numTiles];
+        tileRequestIndices = new int[numTiles];
 
         // --------------------------------------
         // Chain together all of the free tiles
@@ -125,7 +143,7 @@ public class TilePool {
         for (int tileIdx=(numTiles-1); tileIdx>=0; --tileIdx) {
             nodeIdx = tileIdx << TILE_SHIFT;
             // Fake up the node so we can do a Put which chains it in
-            tileNodes[nodeIdx] = Node.EMPTY_USED_NODE;
+            nodes[nodeIdx] = Node.EMPTY_USED_NODE;
             putTileFree(tileIdx);
         }
 
@@ -134,15 +152,21 @@ public class TilePool {
         // --------------------------------------
         for (nodeIdx=0; nodeIdx < numNodes; ++nodeIdx) {
             nodeMaterials[nodeIdx] = 0L;
+            nodeRequests[nodeIdx] = ~0;
         }
 
         // --------------------------------------
         // Init tile-grained data
         // --------------------------------------
         for (int tileIdx=0; tileIdx<numTiles; ++tileIdx) {
-            tilePaths[tileIdx] = 0L;
-            tileUsage[tileIdx] = 0;
-            tileLRU[tileIdx] = 0;
+            // Paths begin empty
+            tilePaths[tileIdx] = ~0L;
+            // Usage is marked as freed
+            tileUsage[tileIdx] = UNUSED_TILE;
+            // LRU points to the tileUsage area.  Init in order.
+            tileLRU[tileIdx] = tileIdx ;
+            // Zero request indexes
+            tileRequestIndices[tileIdx] = 0;
         }
     }
 
@@ -156,25 +180,25 @@ public class TilePool {
     }
 
     /**
-     * Return the size of the tile pool in tileNodes
+     * Return the size of the tile pool in nodes
      *
-     * @return      The number of tileNodes stored in the pool
+     * @return      The number of nodes stored in the pool
      */
     public int numNodes() {
         return numNodes;
     }
 
     /**
-     * Return the tileNodes
+     * Return the nodes
      *
-     * @return      The tileNodes array
+     * @return      The nodes array
      */
     public int[] nodes() {
-        return tileNodes;
+        return nodes;
     }
 
     /**
-     * Return the materials for the tileNodes
+     * Return the materials for the nodes
      *
      * @return      The materials array
      */
@@ -183,13 +207,15 @@ public class TilePool {
     }
 
     /**
-     * Return the paths to the tileNodes
+     * Return the paths to the nodes
      *
      * @return      The paths array
      */
+/*
     public long[] tilePaths() {
         return tilePaths;
     }
+*/
 
     /**
      * Get the node index inside a tile given the tile index and the child within
@@ -205,7 +231,7 @@ public class TilePool {
 
     /**
      * Get the tile index for the tile that the indicate node resides within. Eight
-     * different tileNodes would resolve to the same tile.
+     * different nodes would resolve to the same tile.
      *
      * @param nodeIdx   Node index
      * @return          Index to the tile the node is a part of
@@ -245,19 +271,20 @@ public class TilePool {
         // --------------------------------------
         // Walk to the next free tile in the chain
         // --------------------------------------
-        firstFreeTileIdx = tileNodes[freeNodeIndex];
+        firstFreeTileIdx = nodes[freeNodeIndex];
         if (firstFreeTileIdx == END_OF_FREE_TILES) {
             firstFreeTileIdx = NO_FREE_TILE_INDEX;
         }
 
         // --------------------------------------
-        // Clear the tileNodes in the tile and set them as in use
+        // Clear the nodes in the tile and set them as in use
         // --------------------------------------
         for (int child=0; child<TILE_SIZE; ++child) {
-            tileNodes[freeNodeIndex] = Node.EMPTY_USED_NODE;
+            nodes[freeNodeIndex] = Node.EMPTY_USED_NODE;
             ++freeNodeIndex;
         }
 //        audit(-1);
+        tileUsage[freeTileIndex] = 0;   // Remove unused marker, but make it old
         return freeTileIndex;
     }
 
@@ -274,28 +301,46 @@ public class TilePool {
         if (nextFreeTileIdx == NO_FREE_TILE_INDEX) {
             nextFreeTileIdx = END_OF_FREE_TILES;
         }
-        int nodeIdx = tileIdx << TILE_SHIFT;
-
         // --------------------------------------
         // Mark the tile as being unused
         // --------------------------------------
-        if (!Node.isUsed(tileNodes[nodeIdx])) {
+        if (tileUsage[tileIdx] == UNUSED_TILE) {
             throw new RuntimeException("PUTTING BACK already freed tile " + tileIdx);
         }
+        tileUsage[tileIdx] = UNUSED_TILE;
 
+        // --------------------------------------
+        // Put back any children of this tile
+        // --------------------------------------
+        int nodeIdx = tileIdx << TILE_SHIFT;
         int node;
         audit(0);
         for (int child=0; child<TILE_SIZE; ++child) {
-            node = tileNodes[nodeIdx + child];
-            if (Node.isParent(node)) {
+            node = nodes[nodeIdx + child];
+            if (Node.isParent(node)
+                    && Node.isLoaded(node)) {
+                LOG.info("Free sub-tile {}", Node.tile(node));
                 putTileFree(Node.tile(node));
             }
-            tileNodes[nodeIdx+child] = Node.EMPTY_UNUSED_NODE;
+            nodes[nodeIdx+child] = Node.EMPTY_UNUSED_NODE;
         }
-        tileNodes[nodeIdx] = nextFreeTileIdx;
+        nodes[nodeIdx] = nextFreeTileIdx;
 
         // --------------------------------------
         firstFreeTileIdx = tileIdx;
+
+        // --------------------------------------
+        // Mark the parent of this tile as unloaded
+        // --------------------------------------
+        long path = tilePaths[tileIdx];
+        nodeIdx = getNodeIndexForPath(path) - 1;
+        // TODO: Audit and possibly remove all the mixed-mode node index usages
+        if (nodeIdx >= 0) {
+            nodes[nodeIdx] = Node.setLoaded(nodes[nodeIdx], false);
+        } else {
+            rootNode = Node.setLoaded(rootNode, false);
+        }
+
         audit(1);
     }
 
@@ -313,7 +358,7 @@ public class TilePool {
         if ((tileIdx < 0) || (tileIdx >= numTiles)) {
             throw new RuntimeException("TilePool tile index is out of bounds");
         }
-        return tileNodes[(tileIdx << TILE_SHIFT) + child];
+        return nodes[(tileIdx << TILE_SHIFT) + child];
     }
 */
     /**
@@ -333,7 +378,7 @@ public class TilePool {
         if (nodeIdx == ROOT_NODE_INDEX) {
             return rootNode;
         }
-        return tileNodes[nodeIdx];
+        return nodes[nodeIdx];
     }
 
     /**
@@ -358,7 +403,7 @@ public class TilePool {
     }
 
     /**
-     * Returns the path to the node at the given index in the pool
+     * Returns the path to the tile at the given index in the pool
      *
      * @param tileIdx   Index of the tile to retrieve the path of
      * @return          The path of the node
@@ -370,6 +415,28 @@ public class TilePool {
             throw new RuntimeException("tilePath: TilePool index " + tileIdx + " out of bounds");
         }
         return tilePaths[tileIdx];
+    }
+
+    /**
+     * Returns the path to the node at the given index in the pool
+     *
+     * @param nodeIndex   Index of the node to retrieve the path of
+     * @return          The path of the node
+     * @throws RuntimeException
+     */
+    public long nodePath(int nodeIndex)
+            throws RuntimeException {
+        if ((nodeIndex < 0) || (nodeIndex >= numNodes)) {
+            throw new RuntimeException("nodePath: TilePool index " + nodeIndex + " out of bounds");
+        }
+
+        int tileIdx = getTileForNodeIdx(nodeIndex);
+        long path = 0L;
+        if (tileIdx >= 0) {
+            path = Path.addChild(tilePaths[tileIdx], getChildForNodeIdx(nodeIndex));
+        }
+
+        return path;
     }
 
     /**
@@ -396,7 +463,7 @@ public class TilePool {
             rootNode = node;
             rootNodeMaterial = material;
         } else {
-            tileNodes[nodeIdx] = node;
+            nodes[nodeIdx] = node;
             nodeMaterials[nodeIdx] = material;
         }
     }
@@ -422,7 +489,7 @@ public class TilePool {
         if (nodeIdx == ROOT_NODE_INDEX) {
             rootNode = node;
         } else {
-            tileNodes[nodeIdx] = node;
+            nodes[nodeIdx] = node;
         }
     }
 
@@ -489,13 +556,82 @@ public class TilePool {
     public void stamp(int tileIdx, int timestamp)
             throws RuntimeException {
 
-        if ((tileIdx < 0) || (tileIdx >= numTiles)) {
+        if ((tileIdx < -1) || (tileIdx >= numTiles)) {
             throw new RuntimeException("TilePool index " + tileIdx + " out of bounds");
+        }
+
+        if (tileIdx == ROOT_NODE_INDEX) {
+            return;
         }
 
         tileUsage[tileIdx] = timestamp;
         now = timestamp;
     }
+
+    /**
+     * Mark in the pool that we need to load the children of a given node.
+     * This is tricky, since we want to request based on a path, so we mark the timestamp
+     * into the parent of the child we want to load and use the parent's path to find
+     * the child.  The parent is loaded, the child is not.
+     *
+     * @param nodeIdx
+     * @param timestamp
+     * @throws RuntimeException
+     */
+    public void request(int nodeIdx, int timestamp)
+        throws RuntimeException {
+        if ((nodeIdx < 0) || (nodeIdx >= numNodes)) {
+            throw new RuntimeException("TilePool node " + nodeIdx + " out of bounds");
+        }
+
+        --nodeIdx;
+        if (nodeIdx == ROOT_NODE_INDEX) {
+            throw new RuntimeException("Root node can not be requested");
+        }
+        nodeRequests[nodeIdx] = timestamp;
+    }
+
+    /**
+     * Given a path, find the specific node in the NodePool that it represents,
+     * by traversing the node tree using the choices in the path.
+     *
+     * Technically this is a VoxTree function (and VoxTree has a variation of it)
+     * but for freeing tiles, we need to make the parents as unloaded, hence
+     * we need to interpret the path.
+     *
+     * @param path      Path to traverse to the node
+     * @return          Index of the leaf node we edned on
+     */
+    public int getNodeIndexForPath(long path) {
+        // Cnt and depth of zero is root node
+        int node;
+        int nodeIndex = 0;
+        int depth = Path.length(path);
+
+        // --------------------------------------
+        // Walk down the path...
+        // --------------------------------------
+        for (int cnt=0; cnt<depth; ++cnt) {
+            node = node(nodeIndex);
+
+            // --------------------------------------
+            // Exit if we hit a leaf before the bottom
+            // --------------------------------------
+            if (Node.isLeaf(node)){
+                break;
+            }
+
+            // --------------------------------------
+            // ... and choose the child at this step of the path
+            // --------------------------------------
+            int tile = Node.tile(node);
+            int child = Path.child(path, cnt);
+            nodeIndex = getNodeInTileIdx(tile, child);
+        }
+
+        return nodeIndex;
+    }
+
 
     /**
      * Compresses the tile pool, creating a new pool with only the tiles in use.
@@ -506,7 +642,7 @@ public class TilePool {
      */
     public TilePool compress() {
         // --------------------------------------
-        // Determine the number of tileNodes in use
+        // Determine the number of nodes in use
         // --------------------------------------
         TilePool.Statistics stats = analyze(now);
 
@@ -519,7 +655,7 @@ public class TilePool {
         newPool.rootNodeMaterial = rootNodeMaterial;
 
         // --------------------------------------
-        // Recursively copy the children tiles (of 8 sub-tileNodes)
+        // Recursively copy the children tiles (of 8 sub-nodes)
         // to the new pool.
         // --------------------------------------
         if (Node.isParent(rootNode)) {
@@ -554,7 +690,7 @@ public class TilePool {
             srcNodeIndex = (srcTileIndex<<TILE_SHIFT) + child;
             dstNodeIndex = (dstTileIndex<<TILE_SHIFT) + child;
 
-            dstPool.setNode(dstNodeIndex, tileNodes[srcNodeIndex]);
+            dstPool.setNode(dstNodeIndex, nodes[srcNodeIndex]);
             dstPool.setMaterial(dstNodeIndex, nodeMaterials[srcNodeIndex]);
         }
         dstPool.setPath(dstTileIndex, tilePaths[srcTileIndex]);
@@ -566,14 +702,14 @@ public class TilePool {
         for (int child=0; child<8; ++child) {
             srcNodeIndex = (srcTileIndex<<TILE_SHIFT) + child;
 
-            if (Node.isParent(tileNodes[srcNodeIndex])) {
+            if (Node.isParent(nodes[srcNodeIndex])) {
                 dstNodeIndex = (dstTileIndex<<TILE_SHIFT) + child;
 
                 // --------------------------------------
-                // Keep the tileNodes properly linked, using the destination indices
+                // Keep the nodes properly linked, using the destination indices
                 dstPool.setNode( dstNodeIndex,
                         Node.setTile( dstPool.node(dstNodeIndex),
-                                copyTileSubtree(Node.tile(tileNodes[srcNodeIndex]), dstPool)
+                                copyTileSubtree(Node.tile(nodes[srcNodeIndex]), dstPool)
                         )
                 );
                 // --------------------------------------
@@ -584,16 +720,150 @@ public class TilePool {
         return dstTileIndex;
     }
 
+    /**
+     * Free any tiles that have not been viewed in the last scan, to make room for newly requested tiles.
+     *
+     * @param scan      Scan number
+     */
+    public void freeUnseen(int scan) {
+        /*
+            Tile Usage has scan numbers.
+            LRU has indexes into the tile layout (e.g. tileUsage, other tile ordered things)
+            Scan the LRU indirecting to tile usage and move all recent to the front, keeping order of all
+            not recent after that.
+            Unused tiles are last?
+            Free the oldest (X%) of the unseen tiles?
+         */
+        // --------------------------------------
+        // First Pass: Count Seen, Unseen, Unused
+        // --------------------------------------
+        int seen = 0;
+        int unseen = 0;
+        int unused = 0;
+        int tileIdx;
+        for (tileIdx=0; tileIdx<numTiles; ++tileIdx) {
+            if (tileUsage[tileIdx] == scan) {
+                ++seen;
+            } else if (tileUsage[tileIdx] == UNUSED_TILE) {
+                ++unused;
+            } else {
+                ++unseen;
+            }
+        }
+
+        // --------------------------------------
+        // Second Pass: Sort Seen to the front
+        // --------------------------------------
+        unused = seen + unseen;
+        unseen = seen;
+        seen = 0;
+
+        int[] newLRU = new int[numTiles];
+        for (int srcIdx=0; srcIdx<numTiles; ++srcIdx) {
+            tileIdx = tileLRU[srcIdx];
+            if (tileUsage[tileIdx] == scan) {
+                newLRU[seen] = tileIdx;
+                ++seen;
+            } else if (tileUsage[tileIdx] == UNUSED_TILE) {
+                newLRU[unused] = tileIdx;
+                ++unused;
+            } else {
+                newLRU[unseen] = tileIdx;
+                ++unseen;
+            }
+        }
+        tileLRU = newLRU;
+
+        // --------------------------------------
+        // Third Pass: Make sure we have free tiles on hand
+        // Free anything not seen in 3 scans
+        // --------------------------------------
+        scan -= STALE_TILE_AGE;
+        for (int srcIdx=seen; srcIdx<unseen; ++srcIdx) {
+            tileIdx = tileLRU[srcIdx];
+            if ( (tileUsage[tileIdx] > 0)
+                && (tileUsage[tileIdx] < scan)
+                && (tileIdx > 0)) {
+
+                LOG.info("Free Tile {}", tileIdx);
+                // TODO: SET PARENT OF THIS TILE TO STUB
+                putTileFree(tileIdx);
+                debugPrint("Freeing tile " + tileIdx);
+            }
+        }
+    }
+
+
+    public long[] generateRequests(int scan) {
+        requestPaths = null;
+
+        // --------------------------------------
+        // First pass, count the number of requests
+        // --------------------------------------
+        int requested = 0;
+        int nodeIdx;
+        for (nodeIdx=0; nodeIdx<numNodes; ++nodeIdx) {
+            if (nodeRequests[nodeIdx] == scan) {
+                ++requested;
+            }
+        }
+
+        // --------------------------------------
+        // Second pass, create a list of requested tile indices
+        // TODO: Use fixed list; merge two loops
+        // --------------------------------------
+        if (requested > 0) {
+            requestPaths = new long[requested];
+
+            int dstIdx = 0;
+            for (nodeIdx=0; (nodeIdx<numNodes) && (dstIdx < requested); ++nodeIdx) {
+                if (nodeRequests[nodeIdx] == scan) {
+                    // Offset by 1 to skip root, when using API
+                    int tileIdx = getTileForNodeIdx(nodeIdx+1);
+
+                    long path = tilePaths[tileIdx];
+
+                    requestPaths[dstIdx] = Path.addChild(path, getChildForNodeIdx(nodeIdx+1));
+                    tileRequestIndices[dstIdx] = nodeIdx;
+                    ++dstIdx;
+                }
+            }
+        }
+        return requestPaths;
+    }
+
+    public void provideResponse(long[] response) {
+        int newTileIdx;
+        int newNodeIdx;
+        int nodeIdx;
+        int node;
+        long material;
+        for (int responseIdx=0; responseIdx<response.length; responseIdx+=TILE_SIZE) {
+            newTileIdx = getFreeTile();
+            // TODO: Cope with getFreeTile failure
+
+            nodeIdx = tileRequestIndices[responseIdx>>TILE_SHIFT];
+            nodes[nodeIdx] = Node.setTile(Node.setLoaded(nodes[nodeIdx], true), newTileIdx);
+            tilePaths[newTileIdx] = requestPaths[responseIdx>>TILE_SHIFT];
+
+            for (int child=0; child<TILE_SIZE; ++child) {
+                material = response[responseIdx+child];
+                node = Node.setLoaded(Node.setNodeReponse(0, Material.node(material)), false);
+                newNodeIdx = getNodeInTileIdx(newTileIdx, child) - 1;
+
+                nodes[newNodeIdx] = node;
+                nodeMaterials[newNodeIdx] = Material.clearNode(material);
+            }
+        }
+        debugPrint("Loaded Response (" + response.length + " nodes)");
+    }
+
     /*
     Stream Compaction
     http://www.cse.chalmers.se/~uffe/streamcompaction.pdf
     http://http.developer.nvidia.com/GPUGems2/gpugems2_chapter36.html
     http://www.seas.upenn.edu/~cis565/LECTURES/CUDA%20Tricks.pdf
      */
-    public void processLRU() {
-        // Count valid usages
-        // Generate the LRU indirection table
-    }
 
 
 
@@ -615,9 +885,9 @@ public class TilePool {
             gen.writeNumberField("rootNode", rootNode);
             gen.writeNumberField("rootNodeMaterial", rootNodeMaterial);
 
-            gen.writeArrayFieldStart("tileNodes");
+            gen.writeArrayFieldStart("nodes");
             for (int index=0; index<numNodes; ++index) {
-                gen.writeNumber(tileNodes[index]);
+                gen.writeNumber(nodes[index]);
             }
             gen.writeEndArray();
 
@@ -674,7 +944,7 @@ public class TilePool {
                     rootNode = parse.getIntValue();
                 } else if ("rootNodeMaterial".equals(fieldName)) {
                     rootNodeMaterial = parse.getLongValue();
-                } else if (Arrays.asList("tileNodes", "materials", "paths").contains(fieldName)) {
+                } else if (Arrays.asList("nodes", "materials", "paths").contains(fieldName)) {
                     if (numTiles == 0) {
                         throw new Exception("Serialized data has a zero pool size.");
                     }
@@ -684,9 +954,9 @@ public class TilePool {
                     }
                     int index=0;
 
-                    if ("tileNodes".equals(fieldName)) {
+                    if ("nodes".equals(fieldName)) {
                         while (parse.nextToken() != JsonToken.END_ARRAY) {
-                            tileNodes[index++] =parse.getIntValue();
+                            nodes[index++] =parse.getIntValue();
                         }
                     } else if ("materials".equals(fieldName)) {
                         while (parse.nextToken() != JsonToken.END_ARRAY) {
@@ -721,7 +991,7 @@ public class TilePool {
         output.write(Bytes.toBytes(rootNode), 0, Integer.SIZE/8);
         output.write(Bytes.toBytes(rootNodeMaterial), 0, Long.SIZE/8);
 
-        for (int val : tileNodes) {
+        for (int val : nodes) {
             output.write(Bytes.toBytes(val), 0, Integer.SIZE/8);
         }
 
@@ -763,7 +1033,7 @@ public class TilePool {
 
         for (int cnt=0; cnt<sizeNodes; ++cnt) {
             input.read(buf, 0, Integer.SIZE/8);
-            tileNodes[cnt]= Bytes.toInt(buf);
+            nodes[cnt]= Bytes.toInt(buf);
         }
 
         for (int cnt=0; cnt<sizeNodes; ++cnt) {
@@ -800,7 +1070,7 @@ public class TilePool {
     }
 
     /**
-     * Scan the tile pool and log the count of the various types of tileNodes
+     * Scan the tile pool and log the count of the various types of nodes
      *
      * @param when      Timestamp to run the analysis against
      * @return          Instance of the Statistics object holding the counts
@@ -816,7 +1086,7 @@ public class TilePool {
             // --------------------------------------
             // Tile used?
             // --------------------------------------
-            node = tileNodes[nodeIdx];
+            node = nodes[nodeIdx];
             if (Node.isUsed(node)) {
                 ++stats.numTiles;
 
@@ -827,7 +1097,7 @@ public class TilePool {
                     ++stats.numVisible;
             }
             for (int child=0; child<TILE_SIZE; ++child) {
-                node = tileNodes[nodeIdx + child];
+                node = nodes[nodeIdx + child];
 
                 // --------------------------------------
                 // Tile children leaves or parents?
@@ -923,7 +1193,7 @@ public class TilePool {
         for (int tileIdx=0; tileIdx<num; ++tileIdx){
             int nodeIdx = tileIdx << TILE_SHIFT;
 
-            if (Node.isUsed(tileNodes[nodeIdx])) {
+            if (Node.isUsed(nodes[nodeIdx])) {
                 result.append(nodeIdx);
                 result.append(": ");
                 result.append(Path.toString(tilePaths[tileIdx]));
@@ -934,7 +1204,7 @@ public class TilePool {
                     result.append("   ");
                     result.append(child);
                     result.append(": ");
-                    result.append(Node.toString(tileNodes[nodeIdx + child]));
+                    result.append(Node.toString(nodes[nodeIdx + child]));
                     result.append(" - ");
                     result.append(Material.toString(nodeMaterials[nodeIdx + child]));
                     result.append(NEW_LINE);
@@ -953,6 +1223,48 @@ public class TilePool {
         result.append("}");
 
         return result.toString();
+    }
+
+    /**
+     * Tree interpretation for debugging
+     *
+     */
+    public void debugPrint(String message) {
+        LOG.info("===== {} ====================================================", message);
+        debugWalkNode(0, "root", 0);
+    }
+
+    private void debugWalkNode(int depth, String id, int nodeIndex) {
+
+        return;
+
+/*
+
+        String prefix = String.format("%1$" + (3*depth + 1) + "s", " ");
+
+        int node = node(nodeIndex);
+        long material = material(nodeIndex);
+
+        LOG.info("{}{}({}):{} - {}", new Object[]{prefix, id, nodeIndex, Node.toString(node), Material.toString(material)});
+        if (Node.isParent(node)) {
+            if (Node.isStub(node)) {
+                debugWalkStub(depth+1);
+            } else {
+                int tileIndex = Node.tile(node);
+                LOG.info("{}TILE {} - {}", new Object[]{prefix, tileIndex, Path.toString(tilePaths[tileIndex])});
+                for (int child=0; child<TILE_SIZE; ++child) {
+                    nodeIndex = getNodeInTileIdx(tileIndex, child);
+                    debugWalkNode(depth+1, String.format("%d.%d", tileIndex, child), nodeIndex);
+                }
+            }
+        }
+*/
+    }
+
+    private void debugWalkStub(int depth) {
+        String prefix = String.format("%1$" + (3*depth + 1) + "s", " ");
+
+        LOG.info("{} * STUB", prefix);
     }
 
 }

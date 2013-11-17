@@ -20,6 +20,13 @@ public class VoxTree {
 
     static final Logger LOG = LoggerFactory.getLogger(VoxTree.class.getName());
 
+    // --------------------------------------
+    // How far distant along the t ray is a voxel considered within
+    // picking distance.  Multiple of brick sizes.
+    // --------------------------------------
+    private static final int PICK_DEPTH = 256 * 1;
+
+
     /**
      * Raycasting State used to traverse the voxel oct tree
      */
@@ -63,12 +70,6 @@ public class VoxTree {
             this.child = state.child;
         }
     }
-
-    // --------------------------------------
-    // How far distant along the t ray is a voxel considered within
-    // picking distance.  Multiple of brick sizes.
-    // --------------------------------------
-    private static final int PICK_DEPTH = 256 * 3;
 
     // --------------------------------------
     // Tree dimensions
@@ -202,8 +203,33 @@ public class VoxTree {
     }
 
     public void seedTree(VoxTree seed) {
-        tilePool.setNode(0, Node.setLoaded(seed.tilePool.node(0), false));
+
+        tilePool = new TilePool(tilePool.numTiles());
+
+        // --------------------------------------
+        // Move the root across
+        // --------------------------------------
+        int seedRootNode = seed.tilePool.node(0);
+        tilePool.setNode(0, Node.setLoaded(seedRootNode, true));
         tilePool.setMaterial(0, seed.tilePool.material(0));
+
+        TilePool seedPool = seed.tilePool();
+
+        // --------------------------------------
+        // Move all of the root's children across, a minimal cluster
+        // --------------------------------------
+        int seedTileIdx = Node.tile(seedRootNode);
+        int tileIdx = tilePool.getFreeTile();
+        tilePool.setPath(tileIdx, seedPool.tilePath(seedTileIdx));
+        int seedNodeIdx;
+        int nodeIdx;
+        for (int child=0; child<TilePool.TILE_SIZE; ++child) {
+            nodeIdx = tilePool.getNodeInTileIdx(tileIdx, child);
+            seedNodeIdx = seedPool.getNodeInTileIdx(seedTileIdx, child);
+
+            tilePool.setNode(nodeIdx, Node.setLoaded(seedPool.node(seedNodeIdx), false));
+            tilePool.setMaterial(nodeIdx, seedPool.material(seedNodeIdx));
+        }
     }
 
     public double nearPlane() {
@@ -312,9 +338,9 @@ public class VoxTree {
         // Figure out the precise voxel in the NodePool and set it
         // (and the path metadata describing it)
         // --------------------------------------
-        int nodeIndex = getIndexForPath(path, true);
+        int nodeIndex = getNodeIndexForPath(path, true);
+//        LOG.info("Set for path {} => {}", Path.toString(path), nodeIndex);
         tilePool.setMaterial(nodeIndex, material);
-        tilePool.setPath(tilePool.getTileForNodeIdx(nodeIndex), path);
 
         // --------------------------------------
         // Consolidate the parent voxel if this setting makes it homogeneous
@@ -361,7 +387,7 @@ public class VoxTree {
         // --------------------------------------
         // Traverse the path, do NOT split to reach the end
         // --------------------------------------
-        int nodeIndex = getIndexForPath(path, false);
+        int nodeIndex = getNodeIndexForPath(path, false);
         if (nodeIndex == 0) return 0L;
 
         // --------------------------------------
@@ -396,9 +422,9 @@ public class VoxTree {
         // --------------------------------------
         // Link to the new tile
         // --------------------------------------
-        node = Node.setTile(Node.setLeaf(node, false), tileIndex);
+        node = Node.setTile(Node.setLoaded(Node.setLeaf(node, false), true), tileIndex);
         tilePool.setNode(nodeIndex, node);
-        tilePool.setPath(tileIndex, Path.addChild(tilePool.tilePath(nodeIndex), tilePool.getChildForNodeIdx(nodeIndex)));
+        tilePool.setPath(tileIndex, tilePool.nodePath(nodeIndex));
 
         // --------------------------------------
         // Initialize the tile
@@ -447,7 +473,7 @@ public class VoxTree {
         // --------------------------------------
         // Identify the parent node and the children tile
         // --------------------------------------
-        int nodeIndex = getIndexForPath(path, true);
+        int nodeIndex = getNodeIndexForPath(path, true);
         int parentNode;
         int childTileIndex;
         parentNode = tilePool.node(nodeIndex);
@@ -515,7 +541,7 @@ public class VoxTree {
      * Given a path, find the specific node in the NodePool that it represents,
      * by traversing the node tree using the choices in the path.
      *
-     * For pick rays, we want to split the nodes all the way to the tree root.  For
+     * Sometimes we want to split the nodes all the way to the tree root.  For
      * other purposes, we don't need to split but are just looking for the material at
      * the position indicated, even if it's inside a larger-than-leaf node.
      *
@@ -523,7 +549,7 @@ public class VoxTree {
      * @param split     True if we split merged nodes to get at their (virtual) children
      * @return          Index of the node (or its non-split predecessor, which has the same material).
      */
-    public int getIndexForPath(long path, boolean split) {
+    public int getNodeIndexForPath(long path, boolean split) {
         // Cnt and depth of zero is root node
         int node;
         int nodeIndex = 0;
@@ -713,9 +739,7 @@ public class VoxTree {
             state.set(stateStack[--stateStackTop]);
             int node;
             node = tilePool.node(state.nodeIndex);
-            if (state.nodeIndex > 0) {
-                tilePool.stamp(tilePool.getTileForNodeIdx(state.nodeIndex), timestamp);
-            }
+            tilePool.stamp(tilePool.getTileForNodeIdx(state.nodeIndex), timestamp);
 
             tmin = Math.max(state.t0.x, Math.max(state.t0.y, state.t0.z));
             tmax = Math.min(state.t1.x, Math.min(state.t1.y, state.t1.z));
@@ -760,15 +784,104 @@ public class VoxTree {
                 double dist = tmin;
                 double distRadius = (dist * nearRadius) / nearPlane;
                 evalNow = (voxelRadii[Node.depth(node)] < distRadius);
+            } else {
+                evalNow = Node.isLeaf(node);
             }
 
-            if (evalNow || Node.isLeaf(node)) {
+            if (!evalNow) {
+                if (Node.isLoaded(node)) {
+                    // TODO: Break into a function; this is getting too long
+                    // --------------------------------------
+                    // Hit a node, so descend to the appropriate child
+                    // --------------------------------------
+                    // Remember where we started as we travel farther
+                    int thisChild = state.child;
+                    // Subdivide to a new state for the child at the start of the ray
+                    // and log the options for which child is next
+                    switch (state.child){
+                        case 0:
+                            newState.t0.set(state.t0);
+                            newState.t1.set(state.tM);
+                            tOct.set(4, 2, 1);
+                            break;
+                        case 1:
+                            newState.t0.set(state.t0.x, state.t0.y, state.tM.z);
+                            newState.t1.set(state.tM.x, state.tM.y, state.t1.z);
+                            tOct.set(5, 3, 8);
+                            break;
+                        case 2:
+                            newState.t0.set(state.t0.x, state.tM.y, state.t0.z);
+                            newState.t1.set(state.tM.x, state.t1.y, state.tM.z);
+                            tOct.set(6, 8, 3);
+                            break;
+                        case 3:
+                            newState.t0.set(state.t0.x, state.tM.y, state.tM.z);
+                            newState.t1.set(state.tM.x, state.t1.y, state.t1.z);
+                            tOct.set(7, 9, 10);
+                            break;
+                        case 4:
+                            newState.t0.set(state.tM.x, state.t0.y, state.t0.z);
+                            newState.t1.set(state.t1.x, state.tM.y, state.tM.z);
+                            tOct.set(8, 6, 5);
+                            break;
+                        case 5:
+                            newState.t0.set(state.tM.x, state.t0.y, state.tM.z);
+                            newState.t1.set(state.t1.x, state.tM.y, state.t1.z);
+                            tOct.set(9, 7, 12);
+                            break;
+                        case 6:
+                            newState.t0.set(state.tM.x, state.tM.y, state.t0.z);
+                            newState.t1.set(state.t1.x, state.t1.y, state.tM.z);
+                            tOct.set(10, 12, 7);
+                            break;
+                        case 7:
+                            newState.t0.set(state.tM);
+                            newState.t1.set(state.t1);
+                            tOct.set(11, 13, 14);
+                            break;
+                    }
+
+                    // Traverse... determine the sibling node based on the exit path of the ray
+                    // and push it to the state stack... used when we pop back up the tree
+                    state.child = nextOctant(newState.t1, tOct);
+                    if (state.child < 8) {
+                        stateStack[stateStackTop++].set(state);
+                    }
+
+                    // Descend... find the child node at the start of the ray and
+                    // set up a new state to capture it
+                    newState.tM.add(newState.t0, newState.t1);
+                    newState.tM.scale(0.5);
+                    newState.child = findOctant(newState.t0, newState.tM);
+                    int octantUnMirrored = thisChild ^ mirror;
+                    newState.nodeIndex = tilePool.getNodeInTileIdx(Node.tile(node), octantUnMirrored);
+                    newState.tilePath = Path.addChild(state.tilePath, octantUnMirrored);
+                    if (stateStackTop > depth) {
+//                        LOG.error("STATE STACK OVERFLOW");
+//                        throw new RuntimeException("STATE STACK OVERFLOW");
+                        evalNow = true;
+                        break;
+                    }
+
+                    // ... push the descent state, which will be popped at the top
+                    // of the loop
+                    stateStack[stateStackTop++].set(newState);
+                } else {
+                    if (Node.isParent(node)) {
+                        tilePool.request(state.nodeIndex, timestamp);
+                    }
+                    evalNow = true;
+                }
+            }
+
+            if (evalNow) {
                 // --------------------------------------
                 // Hit a leaf so check its material
                 // --------------------------------------
                 long newMaterial;
                 newMaterial = tilePool.nodeMaterial(state.nodeIndex);
                 if (newMaterial > 0) {
+                    // TODO: Break into a function
                     // Material isn't a void...
 
                     if (pick) {
@@ -833,8 +946,8 @@ public class VoxTree {
                         }
 
                         // Scale alpha based on the cube thickness being passed through
-                        double dt = Math.abs(tmax - tmin) / (double)BRICK_EDGE;
-                        newMaterial = Material.scaleAlpha(newMaterial, dt);
+//                        double dt = Math.abs(tmax - tmin) / (double)BRICK_EDGE;
+//                        newMaterial = Material.scaleAlpha(newMaterial, dt);
 
                         // Light the new material and alphaBlend it with the accumulated material
                         material = Material.alphaBlend(material, lighting.BlinnPhongFixedLight(newMaterial, normal, light, view));
@@ -845,80 +958,6 @@ public class VoxTree {
                     }
                 }
 
-            } else {
-                // --------------------------------------
-                // Hit a node, so descend to the appropriate child
-                // --------------------------------------
-                // Remember where we started as we travel farther
-                int thisChild = state.child;
-                // Subdivide to a new state for the child at the start of the ray
-                // and log the options for which child is next
-                switch (state.child){
-                    case 0:
-                        newState.t0.set(state.t0);
-                        newState.t1.set(state.tM);
-                        tOct.set(4, 2, 1);
-                        break;
-                    case 1:
-                        newState.t0.set(state.t0.x, state.t0.y, state.tM.z);
-                        newState.t1.set(state.tM.x, state.tM.y, state.t1.z);
-                        tOct.set(5, 3, 8);
-                        break;
-                    case 2:
-                        newState.t0.set(state.t0.x, state.tM.y, state.t0.z);
-                        newState.t1.set(state.tM.x, state.t1.y, state.tM.z);
-                        tOct.set(6, 8, 3);
-                        break;
-                    case 3:
-                        newState.t0.set(state.t0.x, state.tM.y, state.tM.z);
-                        newState.t1.set(state.tM.x, state.t1.y, state.t1.z);
-                        tOct.set(7, 9, 10);
-                        break;
-                    case 4:
-                        newState.t0.set(state.tM.x, state.t0.y, state.t0.z);
-                        newState.t1.set(state.t1.x, state.tM.y, state.tM.z);
-                        tOct.set(8, 6, 5);
-                        break;
-                    case 5:
-                        newState.t0.set(state.tM.x, state.t0.y, state.tM.z);
-                        newState.t1.set(state.t1.x, state.tM.y, state.t1.z);
-                        tOct.set(9, 7, 12);
-                        break;
-                    case 6:
-                        newState.t0.set(state.tM.x, state.tM.y, state.t0.z);
-                        newState.t1.set(state.t1.x, state.t1.y, state.tM.z);
-                        tOct.set(10, 12, 7);
-                        break;
-                    case 7:
-                        newState.t0.set(state.tM);
-                        newState.t1.set(state.t1);
-                        tOct.set(11, 13, 14);
-                        break;
-                }
-
-                // Traverse... determine the sibling node based on the exit path of the ray
-                // and push it to the state stack... used when we pop back up the tree
-                state.child = nextOctant(newState.t1, tOct);
-                if (state.child < 8) {
-                    stateStack[stateStackTop++].set(state);
-                }
-
-                // Descend... find the child node at the start of the ray and
-                // set up a new state to capture it
-                newState.tM.add(newState.t0, newState.t1);
-                newState.tM.scale(0.5);
-                newState.child = findOctant(newState.t0, newState.tM);
-                int octantUnMirrored = thisChild ^ mirror;
-                newState.nodeIndex = tilePool.getNodeInTileIdx(Node.tile(node), octantUnMirrored);
-                newState.tilePath = Path.addChild(state.tilePath, octantUnMirrored);
-                if (stateStackTop > depth) {
-                    LOG.error("STATE STACK OVERFLOW");
-                    return material;
-                }
-
-                // ... push the descent state, which will be popped at the top
-                // of the loop
-                stateStack[stateStackTop++].set(newState);
             }
         }
 
@@ -988,6 +1027,25 @@ public class VoxTree {
         return octant.z;  // exit XY Plane
     }
 
+
+    public void requestTileByPath(long path, long[] buffer, int offset) {
+        int nodeIdx = tilePool.getNodeIndexForPath(path);
+        int node = tilePool.node(nodeIdx);
+//        int tileIndex = tilePool.getTileForNodeIdx(nodeIdx);
+        int tileIndex = Node.tile(node);
+        long material;
+        for (int child=0; child<TilePool.TILE_SIZE; ++child) {
+            // Combine material and node details
+            nodeIdx = tilePool.getNodeInTileIdx(tileIndex, child);
+            material = tilePool.material(nodeIdx);
+            node = tilePool.node(nodeIdx);
+
+            material = Material.setNode(material, Node.nodeResponse(node));
+
+            buffer[offset+child] = material;
+        }
+    }
+
     /**
      * String interpretation of the tree, for debugging purposes
      *
@@ -1008,4 +1066,7 @@ public class VoxTree {
         return result.toString();
     }
 
+    public void debugPrint(String msg) {
+        tilePool.debugPrint(msg);
+    }
 }

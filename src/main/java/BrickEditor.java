@@ -1,5 +1,7 @@
 import com.simreal.VoxEngine.Database;
 import com.simreal.VoxEngine.Material;
+import com.simreal.VoxEngine.Path;
+import com.simreal.VoxEngine.TilePool;
 import com.simreal.VoxEngine.VoxTree;
 import com.simreal.VoxEngine.brick.BrickFactory;
 import org.slf4j.Logger;
@@ -18,6 +20,12 @@ import java.awt.image.DataBufferInt;
 public class BrickEditor extends Canvas implements Runnable {
 
     static final Logger LOG = LoggerFactory.getLogger(BrickEditor.class.getName());
+
+    // --------------------------------------
+    // Tree definition.  4 levels gives 16 voxels on an edge, for the standard brick
+    // --------------------------------------
+    /** Tree length, which determines the maximum number of nodes in the tree and the size cube the tree can represent */
+    public static final int TREE_DEPTH = 4;
 
     // --------------------------------------
     // View definition, controlling the pixels that get calculated (versus rendered)
@@ -69,12 +77,6 @@ public class BrickEditor extends Canvas implements Runnable {
     private static Point3d column0;
     private static Point3d at;
     private static Vector3d facing;
-
-    // --------------------------------------
-    // Tree definition.  4 levels gives 16 voxels on an edge, for the standard brick
-    // --------------------------------------
-    /** Tree length, which determines the maximum number of nodes in the tree and the size cube the tree can represent */
-    public static final int TREE_DEPTH = 4;
 
     // --------------------------------------
     // Window and Interface definition
@@ -155,17 +157,36 @@ public class BrickEditor extends Canvas implements Runnable {
         for (int x=0; x<treeModel.breadth(); ++x){
             for (int y=0; y<treeModel.breadth(); ++y){
                 treeModel.setVoxelPoint(
-                        new Point3i((x*stride)+offset,
+                        new Point3i((x * stride) + offset,
                                 0,
-                                (y*stride)+offset),
-                                Material.setMaterial(0, 0, 0, 255, 128, 64));
+                                (y * stride) + offset),
+                        Material.setMaterial(0, 0, 0, 255, 128, 64));
             }
         }
+
+        treeModel.debugPrint("Loaded model");
+
+        long path;
+        path = Path.addChild(0L, 0);
+        path = Path.addChild(path, 0);
+        int idx = treeModel.tilePool().getNodeIndexForPath(path);
+        LOG.info("{} : {}", idx, Path.toString(path));
+
+        path = Path.addChild(0L, 0);
+        path = Path.addChild(path, 1);
+        idx = treeModel.tilePool().getNodeIndexForPath(path);
+        LOG.info("{} : {}", idx, Path.toString(path));
+
+        path = Path.addChild(0L, 0);
+        path = Path.addChild(path, 4);
+        idx = treeModel.tilePool().getNodeIndexForPath(path);
+        LOG.info("{} : {}", idx, Path.toString(path));
 
         // --------------------------------------
         // Initialize the view tree with the root node, which is not a leaf normally
         // --------------------------------------
         treeView.seedTree(treeModel);
+        treeView.debugPrint("Seeded view");
 //        treeView.tilePool().setNode(0, Node.setLoaded(treeModel.tilePool().node(0), false));
 //        treeView.tilePool().setMaterial(0, treeModel.tilePool().material(0));
     }
@@ -181,7 +202,7 @@ public class BrickEditor extends Canvas implements Runnable {
         Thread thread = new Thread(this, "UI");
         thread.start();
 
-        uiListeners = UserInput.instance(this, treeView, database, factory);
+        uiListeners = UserInput.instance(this, treeView, treeModel, database, factory);
 
         (new Thread(uiListeners)).start();
     }
@@ -208,6 +229,7 @@ public class BrickEditor extends Canvas implements Runnable {
         int scan = 0;
         while (running){
             render(++scan);
+            process(scan);
 
             // --------------------------------------
             // Performance statistics, logged every 10 seconds
@@ -242,6 +264,26 @@ public class BrickEditor extends Canvas implements Runnable {
         g.dispose();
 
         bs.show();
+    }
+
+    public void process(int scan) {
+        TilePool pool = treeView.tilePool();
+
+        pool.freeUnseen(scan);
+
+        long[] requests = pool.generateRequests(scan);
+
+        if (null != requests) {
+            int numTiles = requests.length;
+            long[] response = new long[numTiles*8];
+            int responseIdx = 0;
+            for (long path : requests) {
+                treeModel.requestTileByPath(path, response, responseIdx);
+                responseIdx += TilePool.TILE_SIZE;
+            }
+
+            pool.provideResponse(response);
+        }
     }
 
     /**
