@@ -319,7 +319,7 @@ public class TilePool {
             node = nodes[nodeIdx + child];
             if (Node.isParent(node)
                     && Node.isLoaded(node)) {
-                LOG.info("Free sub-tile {}", Node.tile(node));
+//                LOG.info("Free sub-tile {}", Node.tile(node));
                 putTileFree(Node.tile(node));
             }
             nodes[nodeIdx+child] = Node.EMPTY_UNUSED_NODE;
@@ -785,10 +785,8 @@ public class TilePool {
                 && (tileUsage[tileIdx] < scan)
                 && (tileIdx > 0)) {
 
-                LOG.info("Free Tile {}", tileIdx);
-                // TODO: SET PARENT OF THIS TILE TO STUB
                 putTileFree(tileIdx);
-                debugPrint("Freeing tile " + tileIdx);
+                debugPrint("Freed tile " + tileIdx);
             }
         }
     }
@@ -1235,11 +1233,7 @@ public class TilePool {
     }
 
     private void debugWalkNode(int depth, String id, int nodeIndex) {
-
-        return;
-
 /*
-
         String prefix = String.format("%1$" + (3*depth + 1) + "s", " ");
 
         int node = node(nodeIndex);
@@ -1248,7 +1242,7 @@ public class TilePool {
         LOG.info("{}{}({}):{} - {}", new Object[]{prefix, id, nodeIndex, Node.toString(node), Material.toString(material)});
         if (Node.isParent(node)) {
             if (Node.isStub(node)) {
-                debugWalkStub(depth+1);
+                debugWalkStub(depth+1, Node.tile(node));
             } else {
                 int tileIndex = Node.tile(node);
                 LOG.info("{}TILE {} - {}", new Object[]{prefix, tileIndex, Path.toString(tilePaths[tileIndex])});
@@ -1261,10 +1255,10 @@ public class TilePool {
 */
     }
 
-    private void debugWalkStub(int depth) {
+    private void debugWalkStub(int depth, int tileIndex) {
         String prefix = String.format("%1$" + (3*depth + 1) + "s", " ");
 
-        LOG.info("{} * STUB", prefix);
+        LOG.info("{} {} - STUB", prefix, tileIndex);
     }
 
 }
