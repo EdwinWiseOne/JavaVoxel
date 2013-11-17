@@ -69,7 +69,7 @@ public class NodeTest {
         node = Node.setDepth(node, (byte)8);
 
         String str = Node.toString(node);
-        Assert.assertEquals(str, "LEAF { Depth: 8, STUB }");
+        Assert.assertEquals(str, "LEAF { Depth: 8 }");
 
         node = Node.setLeaf(node, false);
         str = Node.toString(node);

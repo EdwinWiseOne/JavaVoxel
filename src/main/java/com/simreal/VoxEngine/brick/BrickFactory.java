@@ -66,7 +66,7 @@ public class BrickFactory {
      * Builder actions generate a voxel brick under the current parameters.
      */
     interface BuilderAction {
-        void build(VoxTree tree, Texture texture);
+        boolean build(VoxTree tree, Texture texture);
     }
     private final BuilderAction[] builderActions;
 
@@ -109,16 +109,16 @@ public class BrickFactory {
         name = "test";
 
         builderActions = new BuilderAction[] {
-                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } },
-                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Coal(tree, texture); } },
-                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Stone(tree, texture); } },
-                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Dirt(tree, texture); } },
-                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Steel(tree, texture); } },
-                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } },
-                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } },
-                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } },
-                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } },
-                new BuilderAction() { public void build(VoxTree tree, Texture texture) { Test(tree, texture); } }
+                new BuilderAction() { public boolean build(VoxTree tree, Texture texture) { return Test(tree, texture); } },
+                new BuilderAction() { public boolean build(VoxTree tree, Texture texture) { return Coal(tree, texture); } },
+                new BuilderAction() { public boolean build(VoxTree tree, Texture texture) { return Stone(tree, texture); } },
+                new BuilderAction() { public boolean build(VoxTree tree, Texture texture) { return Dirt(tree, texture); } },
+                new BuilderAction() { public boolean build(VoxTree tree, Texture texture) { return Steel(tree, texture); } },
+                new BuilderAction() { public boolean build(VoxTree tree, Texture texture) { return Test(tree, texture); } },
+                new BuilderAction() { public boolean build(VoxTree tree, Texture texture) { return Test(tree, texture); } },
+                new BuilderAction() { public boolean build(VoxTree tree, Texture texture) { return Test(tree, texture); } },
+                new BuilderAction() { public boolean build(VoxTree tree, Texture texture) { return Test(tree, texture); } },
+                new BuilderAction() { public boolean build(VoxTree tree, Texture texture) { return Test(tree, texture); } }
         };
     }
 
@@ -149,10 +149,12 @@ public class BrickFactory {
      * @param key       Key event to process
      * @param tree      VoxTree to generate the brick into.
      */
-    public void keyPressed(KeyEvent key, VoxTree tree){
+    public boolean keyPressed(KeyEvent key, VoxTree tree){
         // Control must be down for all Brick Factory keys
+        // (which is enforced by the caller)
+        // But we don't process the control key ITSELF
         if (key.getKeyCode() == KeyEvent.VK_CONTROL) {
-            return;
+            return false;
         }
 
         if (key.isShiftDown()) {
@@ -267,7 +269,7 @@ public class BrickFactory {
         // --------------------------------------
         // Build the brick
         // --------------------------------------
-        builderActions[typeIdx].build(tree, texture);
+        return builderActions[typeIdx].build(tree, texture);
     }
 
     /**
@@ -525,8 +527,8 @@ public class BrickFactory {
     }
 
 
-    public void Test(VoxTree tree, Texture texture) {
-        VoxTree newTree = new VoxTree(tree.depth(), tree.nearPlane(), tree.nearRadius());
+    public boolean Test(VoxTree tree, Texture texture) {
+        VoxTree newTree = new VoxTree(tree.depth(), 1, tree.nearPlane(), tree.nearRadius());
 
         name = "test";
 
@@ -552,10 +554,11 @@ public class BrickFactory {
         }
 
         tree.setPool(newTree.tilePool());
+        return true;
     }
 
-    public void Coal(VoxTree tree, Texture texture) {
-        VoxTree newTree = new VoxTree(tree.depth(), tree.nearPlane(), tree.nearRadius());
+    public boolean Coal(VoxTree tree, Texture texture) {
+        VoxTree newTree = new VoxTree(tree.depth(), 1, tree.nearPlane(), tree.nearRadius());
 
         name = "coal";
 
@@ -577,10 +580,11 @@ public class BrickFactory {
         }
 
         tree.setPool(newTree.tilePool());
+        return true;
     }
 
-    public void Stone(VoxTree tree, Texture texture) {
-        VoxTree newTree = new VoxTree(tree.depth(), tree.nearPlane(), tree.nearRadius());
+    public boolean Stone(VoxTree tree, Texture texture) {
+        VoxTree newTree = new VoxTree(tree.depth(), 1, tree.nearPlane(), tree.nearRadius());
 
         name = "stone";
 
@@ -607,10 +611,11 @@ public class BrickFactory {
         }
 
         tree.setPool(newTree.tilePool());
+        return true;
     }
 
-    public void Dirt(VoxTree tree, Texture texture) {
-        VoxTree newTree = new VoxTree(tree.depth(), tree.nearPlane(), tree.nearRadius());
+    public boolean Dirt(VoxTree tree, Texture texture) {
+        VoxTree newTree = new VoxTree(tree.depth(), 1, tree.nearPlane(), tree.nearRadius());
 
         name = "dirt";
 
@@ -642,10 +647,11 @@ public class BrickFactory {
         }
 
         tree.setPool(newTree.tilePool());
+        return true;
     }
 
-    public void Steel(VoxTree tree, Texture texture) {
-        VoxTree newTree = new VoxTree(tree.depth(), tree.nearPlane(), tree.nearRadius());
+    public boolean Steel(VoxTree tree, Texture texture) {
+        VoxTree newTree = new VoxTree(tree.depth(), 1, tree.nearPlane(), tree.nearRadius());
 
         name = "steel";
 
@@ -674,6 +680,7 @@ public class BrickFactory {
         }
 
         tree.setPool(newTree.tilePool());
+        return true;
     }
 
 }
