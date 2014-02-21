@@ -443,17 +443,18 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
             }
 
             // Now create a new leaf voxel in the empty space adjacent to that selected voxel facet
+            LOG.info("set voxel at {}", center);
             view.setVoxelPoint(center, selectedMaterial);
-            // TODO: REFLECT VIEW CHANGES IN THE MODEL
-
+            model.setVoxelPoint(center, selectedMaterial);
         } else if (mouse.getButton() == MouseEvent.BUTTON3){
             // --------------------------------------
             // Right button is destructing...
             // --------------------------------------
 
             // Set the selected voxel to zero, which eliminates it (empty space)
+            LOG.info("remove voxel {} at {}", view.tilePool().getNodeIndexForPath(path), Path.toString(path));
+            view.setVoxelPath(path, 0);
             model.setVoxelPath(path, 0);
-            // TODO: REFLECT VIEW CHANGES IN THE MODEL
         }
 
     }

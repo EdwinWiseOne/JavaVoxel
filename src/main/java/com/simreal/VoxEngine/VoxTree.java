@@ -24,7 +24,7 @@ public class VoxTree {
     // How far distant along the t ray is a voxel considered within
     // picking distance.  Multiple of brick sizes.
     // --------------------------------------
-    private static final int PICK_DEPTH = 256 * 1;
+    private static final int PICK_DEPTH = 256 * 3;
 
 
     /**
@@ -35,7 +35,7 @@ public class VoxTree {
         public Point3d t0;
         /** Far crossing, distance along the ray */
         public Point3d t1;
-        /** Midpoint of t0 and t1 */
+        /** Midpoint of t0 and t1; trading space for time */
         public Point3d tM;
         /** Path so far, to this tile, not including the child in this state */
         public long tilePath;
@@ -142,7 +142,7 @@ public class VoxTree {
         this.breadth = 1 << depth;
         this.edgeLength = breadth * BRICK_EDGE;
 
-        int tilePoolSize = numBanks * 1024 * 1024 >> 3;    // A million nodes, less that that in tiles.
+        int tilePoolSize = numBanks * 1024 * 1024 >> TilePool.TILE_SHIFT;    // A million nodes, less that that in tiles.
 
         // --------------------------------------
         // Initialize the node pool

@@ -20,6 +20,9 @@ import java.util.Arrays;
  *
  * The TilePool is a fixed size and handles the distribution of free nodes, as well as accepting nodes that are
  * no longer used back into the free node list.
+ *
+ * Sized in number of tiles N, uses 45*N bytes for tile and node storage
+ *
  */
 public class TilePool {
 
@@ -36,15 +39,16 @@ public class TilePool {
     /** Index of the first free (unused) tile in the pool.  Free tiles link into a chain. */
     private int firstFreeTileIdx;
 
-    /** Path meta data */
+    /** Path meta data that also identifies tiles */
     private long[] tilePaths;
-    /** Visibility usage timestamps */
+    /** Visibility (usage) timestamps, set during raycasting via stamp() when a tile is rendered on the view side.
+     * TODO: Flag when a tile is requested from the model side. */
     private int[] tileUsage;
     /** LRU list */
     private int[] tileLRU;
-    /** Paths that we are requesting, from generateRequest */
+    /** Paths to tiles that we are requesting, from generateRequest */
     private long[] requestPaths;
-    /** Indices from generateRequest */
+    /** Indices of nodes that are requesting tiles to be loaded, from generateRequest */
     private int[] tileRequestIndices;
 
     /** The most recently used timestamp */
@@ -64,10 +68,10 @@ public class TilePool {
     private int[] nodes;
     /** Materials */
     private long[] nodeMaterials;
-    /** Request List, which holds the scan # at the index of the node whose child we want to load */
+    /** Request List, which holds the scan # at the index of the node whose tile we want to load; set during raycasting via request().
+     * Like tileUsage, but can't set on tiles, because these tiles do not exist yet.
+     * TODO: Mark dirty nodes on the model side (or tiles as a subset?) */
     private int[] nodeRequests;
-    /** Number of requests at the head of the nodeRequests, after compaction */
-    private int requestNum;
 
     // --------------------------------------
     // Free-Tile Link Markers

@@ -242,15 +242,15 @@ public class Material {
             return "(void)";
         }
 
-        result.append("Material { ");
-        fmt.format("R%02X, ", Material.red(material));
-        fmt.format("G%02X, ", Material.green(material));
-        fmt.format("B%02X, ", Material.blue(material));
-        fmt.format("A%02X, ", Material.alpha(material));
-        fmt.format("a%02X, ", Material.albedo(material));
-        fmt.format("r%02X", Material.reflectance(material));
-        result.append(fmt.toString());
-        result.append(" }");
+        fmt.format("R%02X, ", Material.red(material))
+            .format("G%02X, ", Material.green(material))
+            .format("B%02X, ", Material.blue(material))
+            .format("A%02X, ", Material.alpha(material))
+            .format("a%02X, ", Material.albedo(material))
+            .format("r%02X", Material.reflectance(material));
+        result.append("Material { ")
+              .append(fmt.toString())
+              .append(" }");
         return result.toString();
     }
 
