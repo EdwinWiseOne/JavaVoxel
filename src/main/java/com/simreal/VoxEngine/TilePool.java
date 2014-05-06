@@ -454,22 +454,8 @@ public class TilePool {
     public void setNode(int nodeIdx, int node, long material)
         throws RuntimeException {
 
-        if ((nodeIdx < 0) || (nodeIdx >= numNodes)) {
-            throw new RuntimeException("TilePool index out of bounds");
-        }
-
-        if (!Node.isUsed(node)) {
-            throw new RuntimeException("TilePool setNode given invalid node");
-        }
-
-        --nodeIdx;
-        if (nodeIdx == ROOT_NODE_INDEX) {
-            rootNode = node;
-            rootNodeMaterial = material;
-        } else {
-            nodes[nodeIdx] = node;
-            nodeMaterials[nodeIdx] = material;
-        }
+        setNode(nodeIdx, node);
+        setMaterial(nodeIdx, material);
     }
 
     /**
@@ -796,6 +782,9 @@ public class TilePool {
     }
 
 
+    // Count how many node requests for non-loaded notes was made in the indicated (most recent) scan, and
+    // return an array of the node paths requested, recording which node was assocated with which request
+    // so when a response is given it can be correlated with the missing node.
     public long[] generateRequests(int scan) {
         requestPaths = null;
 
@@ -834,6 +823,9 @@ public class TilePool {
         return requestPaths;
     }
 
+    // Get the response from the last request, which holds the material for a given node, and
+    // link this response into the tree using the associated node index generated and held
+    // internally during the request generation above.
     public void provideResponse(long[] response) {
         int newTileIdx;
         int newNodeIdx;
@@ -850,7 +842,7 @@ public class TilePool {
 
             for (int child=0; child<TILE_SIZE; ++child) {
                 material = response[responseIdx+child];
-                node = Node.setLoaded(Node.setNodeReponse(0, Material.node(material)), false);
+                node = Node.setLoaded(Node.setReponse(0, Material.node(material)), false);
                 newNodeIdx = getNodeInTileIdx(newTileIdx, child) - 1;
 
                 nodes[newNodeIdx] = node;
@@ -1054,20 +1046,23 @@ public class TilePool {
      * Statistics holding class
      */
     class Statistics {
-        /** Number of tiles in use */
+        /** Tiles in use */
         public int numTiles;
+        /** Tiles visible */
+        public int numVisible;
         /** Nodes in use that are not leaves */
         public int numParents;
         /** Nodes in use that are leaves */
         public int numLeaves;
-        /** Nodes that were used in the indicated timestamp */
-        public int numVisible;
+        /** Node parents with loaded children */
+        public int numLoaded;
 
         Statistics() {
             numTiles = 0;
+            numVisible = 0;
             numParents = 0;
             numLeaves = 0;
-            numVisible = 0;
+            numLoaded = 0;
         }
     }
 
@@ -1080,16 +1075,8 @@ public class TilePool {
     Statistics analyze(int when) {
         Statistics stats = new Statistics();
 
-        int nodeIdx;
-        int node;
         for (int tileIdx=0; tileIdx<numTiles; ++tileIdx){
-            nodeIdx = tileIdx << TILE_SHIFT;
-
-            // --------------------------------------
-            // Tile used?
-            // --------------------------------------
-            node = nodes[nodeIdx];
-            if (Node.isUsed(node)) {
+            if (tileUsage[tileIdx] != UNUSED_TILE) {
                 ++stats.numTiles;
 
                 // --------------------------------------
@@ -1097,17 +1084,23 @@ public class TilePool {
                 // --------------------------------------
                 if (tileUsage[tileIdx] == when)
                     ++stats.numVisible;
-            }
-            for (int child=0; child<TILE_SIZE; ++child) {
-                node = nodes[nodeIdx + child];
 
-                // --------------------------------------
-                // Tile children leaves or parents?
-                // --------------------------------------
+            }
+        }
+
+        int node;
+        for (int nodeIdx=0; nodeIdx<numNodes; ++nodeIdx) {
+            // --------------------------------------
+            // Node used?
+            // --------------------------------------
+            node = nodes[nodeIdx];
+            if ((node != UNUSED_TILE) && Node.isUsed(node)) {
                 if (Node.isLeaf(node))
                     ++stats.numLeaves;
                 else
                     ++stats.numParents;
+                if (Node.isLoaded(node))
+                    ++stats.numLoaded;
             }
         }
 

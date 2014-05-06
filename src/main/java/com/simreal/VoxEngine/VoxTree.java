@@ -1031,7 +1031,6 @@ public class VoxTree {
     public void requestTileByPath(long path, long[] buffer, int offset) {
         int nodeIdx = tilePool.getNodeIndexForPath(path);
         int node = tilePool.node(nodeIdx);
-//        int tileIndex = tilePool.getTileForNodeIdx(nodeIdx);
         int tileIndex = Node.tile(node);
         long material;
         for (int child=0; child<TilePool.TILE_SIZE; ++child) {
@@ -1040,7 +1039,7 @@ public class VoxTree {
             material = tilePool.material(nodeIdx);
             node = tilePool.node(nodeIdx);
 
-            material = Material.setNode(material, Node.nodeResponse(node));
+            material = Material.setNode(material, Node.response(node));
 
             buffer[offset+child] = material;
         }

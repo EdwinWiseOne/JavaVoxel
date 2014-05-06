@@ -1,5 +1,6 @@
 import com.simreal.VoxEngine.Database;
 import com.simreal.VoxEngine.Material;
+import com.simreal.VoxEngine.Node;
 import com.simreal.VoxEngine.Path;
 import com.simreal.VoxEngine.TilePool;
 import com.simreal.VoxEngine.VoxTree;
@@ -267,11 +268,11 @@ public class BrickEditor extends Canvas implements Runnable {
     }
 
     public void process(int scan) {
-        TilePool pool = treeView.tilePool();
+        TilePool viewPool = treeView.tilePool();
 
-        pool.freeUnseen(scan);
+        viewPool.freeUnseen(scan);
 
-        long[] requests = pool.generateRequests(scan);
+        long[] requests = viewPool.generateRequests(scan);
 
         if (null != requests) {
             int numTiles = requests.length;
@@ -282,7 +283,7 @@ public class BrickEditor extends Canvas implements Runnable {
                 responseIdx += TilePool.TILE_SIZE;
             }
 
-            pool.provideResponse(response);
+            viewPool.provideResponse(response);
         }
     }
 
@@ -312,6 +313,11 @@ public class BrickEditor extends Canvas implements Runnable {
 
         // Manage the layout
         frame.pack();
+
+        // Some work on shutdown for debugging
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+            public void run() { LOG.info(Node.getHistogram()); }
+        });
 
         // Fire it up!
         editor.startUI();
