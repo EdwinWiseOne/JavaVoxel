@@ -61,6 +61,12 @@ public class Path {
     /** Child choice along the X axis (0 near, 4 far) */
     public static final int X_AXIS = 4;
 
+    /**
+     * Private constructor locks down the utility class
+     */
+    private Path() {
+
+    }
 
     /**
      * Returns the length of the path (the depth of the node it represents in the tree)
@@ -179,9 +185,9 @@ public class Path {
         if ( (position.x < 0)
                 || (position.y < 0)
                 || (position.z < 0)
-                || (position.x > edgeLength)
-                || (position.y > edgeLength)
-                || (position.z > edgeLength) ){
+                || (position.x >= edgeLength)
+                || (position.y >= edgeLength)
+                || (position.z >= edgeLength) ){
             return 0L;
         }
 

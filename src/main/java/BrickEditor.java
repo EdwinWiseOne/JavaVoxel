@@ -212,7 +212,6 @@ public class BrickEditor extends Canvas implements Runnable {
     /**
      * Implements Runnable (for the rendering thread)
      */
-    @Override
     public void run() {
         final int TEN_SECONDS = 10000;
 

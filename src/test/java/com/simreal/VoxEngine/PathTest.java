@@ -68,7 +68,13 @@ public class PathTest {
                 { 4, new Point3i(3, 3, 3),      0x0070000000000004L},
                 { 4, new Point3i(31, 31, 31),   0xFFF0000000000004L},
                 { 4, new Point3i(17, 17, 1),    0xC000000000000004L},
-                { 4, new Point3i(27, 7, 15),    0x95F0000000000004L}
+                { 4, new Point3i(27, 7, 15),    0x95F0000000000004L},
+                { 4, new Point3i(32, 7, 15),    0L},
+                { 4, new Point3i(3, 32, 15),    0L},
+                { 4, new Point3i(1, 7, 32),     0L},
+                { 4, new Point3i(-9, 7, 15),    0L},
+                { 4, new Point3i(3, -1, 15),    0L},
+                { 4, new Point3i(1, 7, -45),    0L}
         };
     }
     @Test(dataProvider = "fromPosition")

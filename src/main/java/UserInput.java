@@ -28,7 +28,7 @@ import java.awt.event.MouseMotionListener;
  *
  * KEYBOARD
  *
- * Ctrl-*   BrickFactory commands
+ * Ctrl-*   BrickFactory commands (see brick/BrickFactory for details)
  *
  * Alt-D    Debug dump of view
  * Alt-I    Color menu
@@ -175,7 +175,6 @@ public class UserInput implements Runnable, KeyListener, MouseListener, MouseMot
      *
      * Control viewpoint movement on the heartbeat.
      */
-    @Override
     public void run() {
 
         running = true;

@@ -4,6 +4,8 @@ import com.simreal.VoxEngine.annotations.Stateless;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashSet;
+
 @Stateless
 public class Node {
 
@@ -23,13 +25,17 @@ public class Node {
      *   +-------+-------+-------+-------+-------+-------+-------+-------+
      * 32              24              16               8               0
      * </pre>
+     *
      */
-    private static final int TILE_MASK          = 0x00FFFFFF;
+
+    static final int TILE_MASK                  = 0x00FFFFFF;
     private static final int RESPONSE_MASK      = 0xFF000000;
+    private static final int DEPTH_MASK         = 0xF0000000;
+    private static final int FLAGS_MASK         = 0x0F000000;
+
     private static final int FLAG_PARENT_MASK   = 0x01000000;
     private static final int FLAG_USED_MASK     = 0x02000000;
     private static final int FLAG_LOADED_MASK   = 0x04000000;
-    private static final int DEPTH_MASK         = 0xF0000000;
 
     public static final int EMPTY_USED_NODE     = 0x02000000;
     public static final int EMPTY_UNUSED_NODE   = 0x00000000;
@@ -37,6 +43,15 @@ public class Node {
     private static final byte TILE_SHIFT        = 0;
     private static final byte RESPONSE_SHIFT    = 24;
     private static final byte DEPTH_SHIFT       = 28;
+
+    private static HashSet<Integer> _histo = new HashSet<Integer>();
+    // or HashMap to COUNT hits
+
+    /**
+     * Private constructor locks down the utility class
+     */
+    private Node() {
+    }
 
     /**
      * Sets the index of the tile that holds this node's children
@@ -69,10 +84,14 @@ public class Node {
      * @return          Node as modified by the setLeaf operation
      */
     static int setLeaf(int node, boolean leaf){
+        int val;
         if (!leaf){
-            return (node | FLAG_PARENT_MASK);
+            val = (node | FLAG_PARENT_MASK);
+        } else {
+            val = (node & ~FLAG_PARENT_MASK);
         }
-        return (node & ~FLAG_PARENT_MASK);
+        _histo.add(val & FLAGS_MASK);
+        return val;
     }
 
     /**
@@ -103,10 +122,14 @@ public class Node {
      * @return          Node as modified by the setUsed operation
      */
     static int setUsed(int node, boolean used){
+        int val;
         if (used){
-            return (node | FLAG_USED_MASK);
+            val = (node | FLAG_USED_MASK);
+        } else {
+            val = (node & ~FLAG_USED_MASK);
         }
-        return (node & ~FLAG_USED_MASK);
+        _histo.add(val & FLAGS_MASK);
+        return val;
     }
 
     /**
@@ -130,10 +153,14 @@ public class Node {
      * @return
      */
     static int setLoaded(int node, boolean loaded) {
+        int val;
         if (loaded) {
-            return (node | FLAG_LOADED_MASK);
+            val = (node | FLAG_LOADED_MASK);
+        } else {
+            val = (node & ~FLAG_LOADED_MASK);
         }
-        return (node & ~FLAG_LOADED_MASK);
+        _histo.add(val & FLAGS_MASK);
+        return val;
     }
 
     /**
@@ -166,7 +193,7 @@ public class Node {
      */
     static int setDepth(int node, byte depth){
         return (node & ~DEPTH_MASK)
-                | ((int)depth << DEPTH_SHIFT);
+                    | ((int)depth << DEPTH_SHIFT);
     }
 
     /**
@@ -179,12 +206,14 @@ public class Node {
         return (byte)((node & DEPTH_MASK) >>> DEPTH_SHIFT);
     }
 
-    static int setNodeReponse(int node, int response){
-        return (node & ~RESPONSE_MASK)
-                | (response << RESPONSE_SHIFT);
+    static int setReponse(int node, int response){
+        int val = (node & ~RESPONSE_MASK)
+                    | (response << RESPONSE_SHIFT);
+        _histo.add(val & FLAGS_MASK);
+        return val;
     }
 
-    static int nodeResponse(int node){
+    static int response(int node){
         return (int)((node & RESPONSE_MASK) >>> RESPONSE_SHIFT);
     }
 
@@ -194,24 +223,26 @@ public class Node {
      * @param node      Node long to describe
      * @return          String description of the node
      */
-    static String toString(int node){
+    static public String toString(int node){
         StringBuilder result = new StringBuilder();
 
-        if (Node.isLeaf(node)) {
-            result.append("LEAF {");
-        } else {
-            result.append("NODE {");
-        }
-        result.append(" Depth: ").append(Node.depth(node));
-        if (Node.isStub(node)) {
-            if (Node.isParent(node)) {
-                result.append(", STUB");
-            }
-        } else {
-            result.append(", Tile: ").append(Node.tile(node));
-        }
-        result.append(" }");
+        result.append( Node.isLeaf(node) ? "LEAF {" : "NODE {")
+                .append(" Depth: ")
+                    .append(Node.depth(node))
+                .append( Node.isStub(node)
+                    ? Node.isParent(node) ? ", STUB" : ""
+                    : ", Tile: " + Node.tile(node) )
+                .append(" }");
         return result.toString();
     }
 
+    static public String getHistogram() {
+        StringBuilder result = new StringBuilder();
+
+        result.append("Node Flags:\n");
+        for (int flag : _histo) {
+            result.append(String.format("%08X : %s\n", flag, toString(flag)));
+        }
+        return result.toString();
+    }
 }
